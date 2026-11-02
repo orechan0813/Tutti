@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS public.schools (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   school_name text NOT NULL,
   club_name text NOT NULL,
+  invite_code text NOT NULL DEFAULT upper(encode(gen_random_bytes(6), 'hex')),
   google_account_email text,
   google_drive_folder_url text,
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -18,6 +19,16 @@ CREATE TABLE IF NOT EXISTS public.schools (
     length(trim(school_name)) > 0 AND length(trim(club_name)) > 0
   )
 );
+
+ALTER TABLE public.schools ADD COLUMN IF NOT EXISTS invite_code text;
+UPDATE public.schools
+SET invite_code = upper(encode(gen_random_bytes(6), 'hex'))
+WHERE invite_code IS NULL OR length(trim(invite_code)) = 0;
+ALTER TABLE public.schools
+  ALTER COLUMN invite_code SET DEFAULT upper(encode(gen_random_bytes(6), 'hex')),
+  ALTER COLUMN invite_code SET NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS schools_invite_code_uidx
+  ON public.schools (invite_code);
 
 COMMENT ON COLUMN public.schools.google_account_email IS
   'Email identifier only. Never store Google passwords or OAuth tokens here.';
@@ -116,6 +127,73 @@ CREATE TABLE IF NOT EXISTS public.equipment (
     (borrower_id IS NULL) = (borrowed_at IS NULL)
   )
 );
+
+CREATE OR REPLACE FUNCTION private.provision_auth_user()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $function$
+DECLARE
+  registration_mode text;
+  full_name_value text;
+  school_name_value text;
+  club_name_value text;
+  invite_code_value text;
+  part_value text;
+  school_id_value uuid;
+  admin_value boolean;
+BEGIN
+  registration_mode := NEW.raw_user_meta_data ->> 'registration_mode';
+  full_name_value := nullif(pg_catalog.btrim(NEW.raw_user_meta_data ->> 'full_name'), '');
+  part_value := nullif(pg_catalog.btrim(NEW.raw_user_meta_data ->> 'part'), '');
+
+  IF full_name_value IS NULL THEN
+    RAISE EXCEPTION '氏名を入力してください。';
+  END IF;
+
+  IF registration_mode = 'create' THEN
+    school_name_value := nullif(pg_catalog.btrim(NEW.raw_user_meta_data ->> 'school_name'), '');
+    club_name_value := nullif(pg_catalog.btrim(NEW.raw_user_meta_data ->> 'club_name'), '');
+    IF school_name_value IS NULL OR club_name_value IS NULL THEN
+      RAISE EXCEPTION '学校名と部活・団体名を入力してください。';
+    END IF;
+
+    INSERT INTO public.schools (school_name, club_name)
+    VALUES (school_name_value, club_name_value)
+    RETURNING id INTO school_id_value;
+    admin_value := true;
+  ELSIF registration_mode = 'join' THEN
+    invite_code_value := pg_catalog.upper(
+      pg_catalog.btrim(NEW.raw_user_meta_data ->> 'invite_code')
+    );
+    IF invite_code_value IS NULL OR invite_code_value !~ '^[0-9A-F]{12}$' THEN
+      RAISE EXCEPTION '招待コードの形式が正しくありません。';
+    END IF;
+
+    SELECT s.id INTO school_id_value
+    FROM public.schools AS s
+    WHERE s.invite_code = invite_code_value;
+    IF school_id_value IS NULL THEN
+      RAISE EXCEPTION '招待コードが見つかりません。コードを確認してください。';
+    END IF;
+    admin_value := false;
+  ELSE
+    RAISE EXCEPTION '登録方法が正しくありません。';
+  END IF;
+
+  INSERT INTO public.profiles (id, school_id, full_name, part, is_admin)
+  VALUES (NEW.id, school_id_value, full_name_value, part_value, admin_value);
+  RETURN NEW;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION private.provision_auth_user() FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS provision_profile_after_signup ON auth.users;
+CREATE TRIGGER provision_profile_after_signup
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION private.provision_auth_user();
 
 CREATE INDEX IF NOT EXISTS profiles_school_id_idx ON public.profiles (school_id);
 CREATE INDEX IF NOT EXISTS schedules_school_starts_idx ON public.schedules (school_id, starts_at);
@@ -436,9 +514,8 @@ GRANT UPDATE (name, borrower_id, borrowed_at)
   ON public.equipment TO authenticated;
 GRANT DELETE ON TABLE public.equipment TO authenticated;
 
--- School rows and the first admin profile must be provisioned by a trusted
--- backend using the service role. Never expose the service-role key to clients.
--- Profile inserts after bootstrap are limited by profiles_insert_admin.
+-- The auth.users trigger provisions the initial school/profile atomically.
+-- Never expose the service-role key to clients.
 
 -- Store report photos in a private bucket at <school_id>/<unique-file-name>.
 INSERT INTO storage.buckets (id, name, public)

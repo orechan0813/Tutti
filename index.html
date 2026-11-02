@@ -210,6 +210,10 @@
     .auth-message { margin: 8px 0 20px; color: var(--muted); font-size: 12px; }
     .auth-error { margin-top: 13px; color: #b65743; font-size: 11px; }
     .auth-panel .primary-button { width: 100%; }
+    .auth-mode-options { display: grid; gap: 8px; }
+    .auth-mode-option { display: flex; align-items: flex-start; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: #fbfcfa; }
+    .auth-mode-option input { margin-top: 3px; }
+    .invite-code { font-size: 20px; font-weight: 700; letter-spacing: .12em; }
     .drawer-scrim { display: none; }
     @media (max-width: 1050px) {
       .sidebar { width: 226px; }
@@ -336,7 +340,7 @@
         { id: 'song-5', title: '銀河鉄道999', byline: 'タケカワ ユキヒデ / 樽屋 雅徳 編曲', sortKey: 'Galaxy Express 999', drive: 'https://drive.google.com/', youtube: 'https://www.youtube.com/results?search_query=Galaxy+Express+999+wind+orchestra' }
       ]
     };
-    const emptyWorkspace = () => ({ isAdmin: false, schoolId: null, schoolName: '', clubName: '', userName: '', userId: null, theme: { page: '#f3f5ef', ink: '#19332f', font: 'DM Sans' }, events: [], notices: [], absences: [], meters: [], lost: null, requests: [], members: [], songs: [] });
+    const emptyWorkspace = () => ({ isAdmin: false, schoolId: null, schoolName: '', clubName: '', inviteCode: '', userName: '', userId: null, theme: { page: '#f3f5ef', ink: '#19332f', font: 'DM Sans' }, events: [], notices: [], absences: [], meters: [], lost: null, requests: [], members: [], songs: [] });
     let data = emptyWorkspace();
     let currentSession = null;
     let currentProfile = null;
@@ -344,6 +348,7 @@
     let loadSequence = 0;
     let authMessage = '';
     let authMode = 'signin';
+    let signupType = 'create';
     let activePage = 'home';
     let calendarDate = new Date();
     let selectedDate = dayKey(new Date());
@@ -400,7 +405,7 @@
       if (sequence !== loadSequence) return;
       if (!profile) {
         currentProfile = null;
-        authMessage = 'このメールアドレスの部員プロフィールがありません。アカウント登録後、部活管理者に名簿への追加を依頼してください。';
+        authMessage = 'このアカウントには部員プロフィールがありません。団体管理者にお問い合わせください。';
         render();
         return;
       }
@@ -414,7 +419,7 @@
         profile.part = registeredParts;
       }
       const [school, members, scheduleRows, reports, songRows, announcementRows, settingsData, equipmentRows] = await Promise.all([
-        supabaseClient.from('schools').select('id, school_name, club_name').eq('id', schoolId).single(),
+        supabaseClient.from('schools').select('id, school_name, club_name, invite_code').eq('id', schoolId).single(),
         readRows(supabaseClient.from('profiles').select('id, full_name, part, is_admin').eq('school_id', schoolId).order('full_name'), 'profiles'),
         readRows(supabaseClient.from('schedules').select('id, title, content, starts_at, ends_at, location').eq('school_id', schoolId).order('starts_at'), 'schedules'),
         readRows(supabaseClient.from('reports').select('id, reporter_id, kind, report_date, title, reason, arrival_at, photo_url, status, created_at').eq('school_id', schoolId).order('created_at', { ascending: false }), 'reports'),
@@ -438,6 +443,7 @@
         schoolId,
         schoolName: schoolData.school_name,
         clubName: schoolData.club_name,
+        inviteCode: schoolData.invite_code,
         userName: profile.full_name,
         userId: profile.id,
         isAdmin: profile.is_admin,
@@ -483,11 +489,10 @@
       document.getElementById('authGate').hidden = false;
       const registering = authMode === 'signup';
       const title = signedIn ? '部活プロフィールを確認' : registering ? '新規部員登録' : 'Tutti にログイン';
-      const message = authMessage || (signedIn ? '所属団体のデータを読み込んでいます。' : registering ? '登録後、部活管理者に名簿への追加を依頼してください。' : 'メールアドレスとパスワードでログインしてください。');
-      const partFields = registering ? '<div class="field"><label for="authPartPrimary">メインパート（パート1）</label><input id="authPartPrimary" name="partPrimary" autocomplete="off" placeholder="例：Alto Sax" required></div><div class="field"><label for="authPartSecondary">サブパート（パート2・任意）</label><input id="authPartSecondary" name="partSecondary" autocomplete="off" placeholder="例：Piano"></div>' : '';
-      const nameField = registering ? '<div class="field full"><label for="authFullName">氏名</label><input id="authFullName" name="fullName" autocomplete="name" required></div>' : '';
+      const message = authMessage || (signedIn ? '所属団体のデータを読み込んでいます。' : registering ? signupType === 'create' ? '団体と管理者アカウントを作成します。' : '招待コードを使って既存の団体に参加します。' : 'メールアドレスとパスワードでログインしてください。');
+      const signupFields = registering ? `<fieldset class="field full" style="border:0;padding:0;margin:0"><legend class="field" style="margin-bottom:7px">登録方法</legend><div class="auth-mode-options"><label class="auth-mode-option"><input type="radio" name="registrationMode" value="create" ${signupType === 'create' ? 'checked' : ''} required><span>部活・団体を新しく登録する（管理者アカウント）</span></label><label class="auth-mode-option"><input type="radio" name="registrationMode" value="join" ${signupType === 'join' ? 'checked' : ''} required><span>既存の部活に参加する（一般部員アカウント）</span></label></div></fieldset>${signupType === 'create' ? '<div class="field full"><label for="authSchoolName">学校名</label><input id="authSchoolName" name="schoolName" autocomplete="organization" placeholder="例：青葉高校" required></div><div class="field full"><label for="authClubName">部活・団体名</label><input id="authClubName" name="clubName" placeholder="例：吹奏楽部" required></div>' : '<div class="field"><label for="authPartPrimary">メインパート</label><input id="authPartPrimary" name="partPrimary" autocomplete="off" placeholder="例：Alto Sax" required></div><div class="field"><label for="authPartSecondary">サブパート（任意）</label><input id="authPartSecondary" name="partSecondary" autocomplete="off" placeholder="例：Piano"></div><div class="field full"><label for="authInviteCode">招待コード</label><input id="authInviteCode" name="inviteCode" autocomplete="off" autocapitalize="characters" minlength="12" maxlength="12" pattern="[A-Fa-f0-9]{12}" placeholder="12桁のコード" required></div>'}<div class="field full"><label for="authFullName">氏名</label><input id="authFullName" name="fullName" autocomplete="name" required></div>` : '';
       const signedInActions = '<button class="secondary-button" data-auth-action="sign-out">ログアウト</button>';
-      const authForm = `<form id="authForm" class="field-grid">${nameField}${partFields}<div class="field full"><label for="authEmail">メールアドレス</label><input id="authEmail" name="email" type="email" autocomplete="email" required></div><div class="field full"><label for="authPassword">パスワード</label><input id="authPassword" name="password" type="password" autocomplete="${registering ? 'new-password' : 'current-password'}" minlength="6" required></div><div class="field full"><button class="primary-button" type="submit">${registering ? '登録する' : 'ログイン'}</button></div></form><button class="secondary-button" style="width:100%;margin-top:9px" data-auth-action="toggle-mode">${registering ? 'ログイン画面に戻る' : '新規部員登録'}</button>`;
+      const authForm = `<form id="authForm" class="field-grid">${signupFields}<div class="field full"><label for="authEmail">メールアドレス</label><input id="authEmail" name="email" type="email" autocomplete="email" required></div><div class="field full"><label for="authPassword">パスワード</label><input id="authPassword" name="password" type="password" autocomplete="${registering ? 'new-password' : 'current-password'}" minlength="6" required></div><div class="field full"><button class="primary-button" type="submit">${registering ? '登録する' : 'ログイン'}</button></div></form><button class="secondary-button" style="width:100%;margin-top:9px" data-auth-action="toggle-mode">${registering ? 'ログイン画面に戻る' : '新規部員登録'}</button>`;
       document.getElementById('authGate').innerHTML = `<section class="auth-panel"><div class="brand" style="padding:0"><div class="brand-mark">T</div><div><div class="brand-name">tutti</div><div class="brand-caption">部活の毎日を、ひとつに。</div></div></div><h1>${title}</h1><p class="auth-message">${escapeHtml(message)}</p>${signedIn ? signedInActions : authForm}<div class="auth-error" id="authError"></div></section>`;
     }
     function handleWorkspaceError(error) {
@@ -561,6 +566,7 @@
             <section class="panel"><div class="panel-head"><div><div class="panel-title">今日の欠席・遅刻</div><div class="panel-note">事前に届いた連絡</div></div><button class="quiet-button" data-page="calendar">履歴を見る →</button></div><div class="panel-body">${todayAbsences.length ? `<div class="person-list">${todayAbsences.map(item => `<div class="person-row"><div class="mini-avatar">${escapeHtml(initials(item.name))}</div><div class="person-info"><div class="person-name">${escapeHtml(item.name)}</div><div class="person-detail">${escapeHtml(item.detail)}</div></div><span class="person-tag">連絡済み</span></div>`).join('')}</div>` : '<div class="empty-state">欠席・遅刻の連絡はありません。</div>'}</div></section>
           </div>
           <div class="stack">
+            <section class="panel"><div class="panel-head"><div><div class="panel-title">部員招待コード</div><div class="panel-note">このコードを共有すると部員が参加できます</div></div></div><div class="panel-body"><div class="invite-code">${escapeHtml(data.inviteCode || '未設定')}</div>${data.inviteCode ? '<button class="secondary-button" style="margin-top:10px" data-action="copy-invite-code">コードをコピー</button>' : ''}</div></section>
             <section class="panel"><div class="panel-head"><div><div class="panel-title">メトロノーム</div><div class="panel-note">貸出状況</div></div><span class="panel-note">${available} / ${data.meters.length}台 空き</span></div><div class="panel-body">${data.meters.map(item => `<div class="meter-row"><div class="meter-icon">♩</div><div class="meter-info"><div class="meter-name">${escapeHtml(item.name)}</div><div class="meter-status">${escapeHtml(item.status)}</div></div><span class="status-dot" style="background:${item.status.includes('できます')?'#67a884':'#e4ad55'}"></span></div>`).join('')}</div></section>
             <section class="panel"><div class="panel-head"><div><div class="panel-title">落とし物のお知らせ</div><div class="panel-note">心当たりはありませんか？</div></div><button class="quiet-button" data-form="lost">報告する</button></div><div class="panel-body"><div class="lost-feature"><img class="lost-image" src="${escapeHtml(data.lost.image)}" alt="${escapeHtml(data.lost.title)}" onerror="this.src='https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=440&q=80'"><div><div class="lost-title">${escapeHtml(data.lost.title)}</div><div class="lost-copy">${escapeHtml(data.lost.body)}</div><div class="lost-date">${escapeHtml(dateLabel(data.lost.date))}</div></div></div></div></section>
             <section class="panel"><div class="panel-head"><div><div class="panel-title">今週の予定</div><div class="panel-note">次の合奏まであと少し</div></div></div><div class="panel-body">${data.events.filter(item => item.date >= todayKey).slice(0,3).map(item => `<div class="detail-row"><div class="detail-time">${escapeHtml(new Date(`${item.date}T12:00:00`).getDate())}日</div><div class="person-info"><div class="person-name">${escapeHtml(item.title)}</div><div class="person-detail">${escapeHtml(item.time)} · ${escapeHtml(item.place)}</div></div></div>`).join('') || '<div class="empty-state">予定はありません。</div>'}</div></section>
@@ -666,6 +672,11 @@
       if (target.dataset.action==='add-song') { openSongModal(); return; }
       if (target.dataset.action==='edit-song') { const song=data.songs.find(item=>item.id===target.dataset.id); if(song) openSongModal(song); return; }
       if (target.dataset.action==='play-song') { playSong(target.dataset.id); return; }
+      if (target.dataset.action==='copy-invite-code') {
+        if (!navigator.clipboard?.writeText) { showToast('コピーできません。招待コードを選択してコピーしてください。'); return; }
+        navigator.clipboard.writeText(data.inviteCode).then(() => showToast('招待コードをコピーしました')).catch(error => showDatabaseError(error));
+        return;
+      }
       if (target.id==='menuButton') { openDrawer(); return; }
       if (target.id==='noticeButton') { openRequestForm('absence'); return; }
       if (target.id==='clubSwitch') { showToast(`${data.schoolName} · ${data.clubName}`); return; }
@@ -720,6 +731,7 @@
     modalBackdrop.addEventListener('click', event => { if(event.target===modalBackdrop) closeModal(); });
     document.addEventListener('keydown', event => { if(event.key==='Escape'){closeModal();closeDrawer();} });
     document.addEventListener('change', event => {
+      if (event.target.name === 'registrationMode') { signupType = event.target.value; renderAuthGate(); return; }
       if(event.target.id==='lostPhoto' && event.target.files[0]) { const reader=new FileReader();reader.onload=()=>{const preview=document.getElementById('lostPreview');preview.src=reader.result;preview.style.display='block';};reader.readAsDataURL(event.target.files[0]); }
     });
     document.addEventListener('submit', async event => {
@@ -733,15 +745,25 @@
         try {
           if (authMode === 'signup') {
             const fullName = String(values.get('fullName') || '').trim();
-            const partPrimary = String(values.get('partPrimary') || '').trim();
-            const partSecondary = String(values.get('partSecondary') || '').trim();
-            const part = [partPrimary, partSecondary].filter(Boolean).join(' / ');
-            const { data: signUpData, error } = await supabaseClient.auth.signUp({ email, password, options: { data: { full_name: fullName, part, part_primary: partPrimary, part_secondary: partSecondary } } });
+            const registrationMode = String(values.get('registrationMode') || '');
+            const metadata = { registration_mode: registrationMode, full_name: fullName };
+            if (registrationMode === 'create') {
+              metadata.school_name = String(values.get('schoolName') || '').trim();
+              metadata.club_name = String(values.get('clubName') || '').trim();
+            } else if (registrationMode === 'join') {
+              const partPrimary = String(values.get('partPrimary') || '').trim();
+              const partSecondary = String(values.get('partSecondary') || '').trim();
+              metadata.part = [partPrimary, partSecondary].filter(Boolean).join(' / ');
+              metadata.invite_code = String(values.get('inviteCode') || '').trim().toUpperCase();
+            } else {
+              throw new Error('登録方法を選択してください。');
+            }
+            const { data: signUpData, error } = await supabaseClient.auth.signUp({ email, password, options: { data: metadata } });
             if (error) throw error;
             if (signUpData.session) await applySession(signUpData.session);
             else {
               authMode = 'signin';
-              authMessage = 'アカウントを作成しました。ログイン後、部活管理者に名簿への追加を依頼してください。';
+              authMessage = '登録を受け付けました。確認メールのリンクを開いてからログインしてください。';
               renderAuthGate();
             }
           } else {
