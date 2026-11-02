@@ -1,0 +1,819 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f3f5ef">
+  <title>Tutti | 部活の毎日を、ひとつに。</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --page: #f3f5ef;
+      --surface: #ffffff;
+      --ink: #19332f;
+      --muted: #78837c;
+      --line: #e6eae3;
+      --green: #2f7161;
+      --green-pale: #e8f2ed;
+      --coral: #e97962;
+      --yellow: #f1c96a;
+      --shadow: 0 12px 35px rgba(37, 61, 51, .06);
+      --font: "DM Sans", "Noto Sans JP", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--page); color: var(--ink); font-family: var(--font); font-size: 14px; line-height: 1.55; }
+    button, input, select, textarea { font: inherit; }
+    button { color: inherit; }
+    .app { min-height: 100vh; }
+    .sidebar { width: 252px; position: fixed; inset: 0 auto 0 0; padding: 27px 18px 20px; background: #fff; border-right: 1px solid var(--line); display: flex; flex-direction: column; z-index: 20; transition: transform .24s ease; }
+    .brand { display: flex; align-items: center; gap: 11px; padding: 0 11px 26px; }
+    .brand-mark { width: 36px; height: 36px; display: grid; place-items: center; background: var(--green); color: #fff; border-radius: 12px; font-size: 19px; font-weight: 800; }
+    .brand-name { font-family: "DM Sans", sans-serif; font-size: 23px; line-height: 1; font-weight: 700; letter-spacing: 0; }
+    .brand-caption { color: var(--muted); font-size: 10px; margin-top: 4px; }
+    .club-switch { display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px; border: 1px solid var(--line); border-radius: 9px; background: #fbfcfa; text-align: left; cursor: pointer; margin-bottom: 25px; }
+    .club-avatar { flex: 0 0 34px; height: 34px; border-radius: 9px; background: #f9e3da; color: #b75542; display: grid; place-items: center; font-weight: 700; }
+    .club-name { font-weight: 700; font-size: 12px; }
+    .club-school { color: var(--muted); font-size: 11px; }
+    .club-arrow { margin-left: auto; color: var(--muted); }
+    .nav-label { padding: 0 12px 8px; color: #9aa39d; font-size: 10px; font-weight: 700; letter-spacing: .08em; }
+    .nav-list { display: grid; gap: 4px; }
+    .nav-item { width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 12px; text-decoration: none; border: 0; border-radius: 8px; background: transparent; color: #65726b; text-align: left; cursor: pointer; font-size: 13px; }
+    .nav-item:hover { background: #f6f8f5; color: var(--ink); }
+    .nav-item.active { background: var(--green-pale); color: var(--green); font-weight: 700; }
+    .nav-icon { width: 18px; text-align: center; font-size: 16px; }
+    .nav-divider { height: 1px; background: var(--line); margin: 17px 7px; }
+    .nav-badge { margin-left: auto; min-width: 20px; padding: 1px 6px; background: #fbe9e4; color: #b65743; border-radius: 99px; text-align: center; font-size: 10px; font-weight: 700; }
+    .sidebar-bottom { margin-top: auto; }
+    .storage-note { display: flex; gap: 9px; align-items: flex-start; margin: 0 5px 16px; padding: 11px; background: #f7f8f5; border-radius: 8px; color: var(--muted); font-size: 10px; }
+    .user-row { display: flex; align-items: center; gap: 10px; padding: 12px 8px 0; border-top: 1px solid var(--line); }
+    .user-avatar { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; background: #f5d6c9; color: #784b3d; font-weight: 700; }
+    .user-name { font-size: 12px; font-weight: 700; }
+    .user-role { color: var(--muted); font-size: 10px; }
+    .user-menu { margin-left: auto; border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 18px; }
+    .main { min-height: 100vh; margin-left: 252px; }
+    .topbar { height: 74px; padding: 0 38px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); background: rgba(255,255,255,.82); }
+    .crumb { color: var(--muted); font-size: 12px; }
+    .crumb strong { color: var(--ink); font-weight: 600; }
+    .top-actions { display: flex; align-items: center; gap: 12px; }
+    .today-label { color: var(--muted); font-size: 12px; }
+    .icon-button { width: 36px; height: 36px; border: 1px solid var(--line); background: #fff; border-radius: 9px; cursor: pointer; }
+    .icon-button:hover { border-color: #b4c8bd; }
+    .mobile-menu { display: none; }
+    .content { width: min(1180px, 100%); margin: 0 auto; padding: 31px 38px 55px; }
+    .welcome-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; margin-bottom: 24px; }
+    .eyebrow { color: var(--green); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+    h1 { margin: 4px 0 0; font-size: 25px; line-height: 1.35; letter-spacing: 0; }
+    .subheading { margin-top: 5px; color: var(--muted); font-size: 12px; }
+    .primary-button, .secondary-button, .quiet-button, .danger-button { min-height: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 14px; border-radius: 8px; font-weight: 600; font-size: 12px; cursor: pointer; }
+    .primary-button { background: var(--green); border: 1px solid var(--green); color: #fff; }
+    .primary-button:hover { filter: brightness(.94); }
+    .secondary-button { background: #fff; border: 1px solid var(--line); color: var(--ink); }
+    .secondary-button:hover { border-color: #b4c8bd; }
+    .quiet-button { min-height: 30px; padding: 0 9px; border: 0; color: var(--green); background: transparent; }
+    .danger-button { min-height: 31px; border: 1px solid #f1d7d1; background: #fff8f6; color: #b65743; }
+    .grid { display: grid; gap: 16px; }
+    .stats-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 17px; }
+    .stat-card, .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); }
+    .stat-card { min-height: 110px; padding: 16px 18px; }
+    .stat-top { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 11px; }
+    .stat-symbol { display: grid; place-items: center; width: 29px; height: 29px; border-radius: 8px; background: var(--green-pale); color: var(--green); }
+    .stat-number { margin-top: 8px; font-size: 24px; line-height: 1; font-weight: 700; }
+    .stat-foot { margin-top: 6px; color: var(--muted); font-size: 10px; }
+    .home-grid { grid-template-columns: minmax(0, 1.5fr) minmax(290px, .92fr); align-items: start; }
+    .stack { display: grid; gap: 16px; }
+    .panel { overflow: hidden; }
+    .panel-head { min-height: 57px; display: flex; align-items: center; justify-content: space-between; padding: 13px 18px; border-bottom: 1px solid var(--line); }
+    .panel-title { font-size: 13px; font-weight: 700; }
+    .panel-note { color: var(--muted); font-size: 10px; }
+    .panel-body { padding: 16px 18px; }
+    .practice-card { position: relative; overflow: hidden; background: #214b42; color: white; border-radius: 9px; padding: 19px 20px; }
+    .practice-card:after { content: ""; position: absolute; width: 170px; height: 170px; right: -37px; top: -63px; border: 1px solid rgba(255,255,255,.17); border-radius: 50%; box-shadow: 0 0 0 19px rgba(255,255,255,.04), 0 0 0 41px rgba(255,255,255,.035); }
+    .practice-date { color: #b8d5c9; font-size: 11px; }
+    .practice-title { margin: 6px 0 10px; font-size: 19px; font-weight: 700; }
+    .practice-meta { display: flex; flex-wrap: wrap; gap: 16px; color: #e2eee8; font-size: 11px; }
+    .practice-meta span { display: flex; gap: 6px; }
+    .announcement { display: grid; grid-template-columns: 35px 1fr; gap: 12px; padding: 12px 0; border-bottom: 1px solid #edf0ec; }
+    .announcement:first-child { padding-top: 0; }
+    .announcement:last-child { padding-bottom: 0; border: 0; }
+    .announcement-mark { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; background: #fff2dc; color: #a97924; }
+    .announcement-title { font-size: 12px; font-weight: 700; }
+    .announcement-copy { margin-top: 3px; color: #66736c; font-size: 11px; }
+    .announcement-date { margin-top: 5px; color: #9aa39d; font-size: 10px; }
+    .person-list { display: grid; gap: 12px; }
+    .person-row { display: flex; align-items: center; gap: 10px; }
+    .mini-avatar { width: 30px; height: 30px; flex: 0 0 30px; display: grid; place-items: center; border-radius: 50%; background: #e6eee8; color: #426556; font-size: 10px; font-weight: 700; }
+    .person-info { flex: 1; min-width: 0; }
+    .person-name { font-size: 11px; font-weight: 700; }
+    .person-detail { color: var(--muted); font-size: 10px; }
+    .person-tag { padding: 3px 7px; border-radius: 99px; background: #f4f6f3; color: #718078; font-size: 9px; }
+    .meter-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #edf0ec; }
+    .meter-row:last-child { border: 0; padding-bottom: 0; }
+    .meter-icon { width: 32px; height: 32px; display: grid; place-items: center; background: #f8f0db; border-radius: 9px; }
+    .meter-info { flex: 1; }
+    .meter-name { font-size: 11px; font-weight: 600; }
+    .meter-status { font-size: 10px; color: var(--muted); }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #67a884; }
+    .lost-feature { display: grid; grid-template-columns: 105px 1fr; gap: 13px; align-items: center; }
+    .lost-image { width: 105px; height: 85px; object-fit: cover; border-radius: 8px; background: #e7ebe4; }
+    .lost-title { font-size: 12px; font-weight: 700; }
+    .lost-copy { margin-top: 3px; color: var(--muted); font-size: 10px; }
+    .lost-date { margin-top: 8px; color: #9aa39d; font-size: 10px; }
+    .page-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 20px 0 16px; }
+    .search-box { width: min(320px, 100%); height: 38px; display: flex; align-items: center; gap: 8px; padding: 0 11px; background: white; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); }
+    .search-box input { width: 100%; outline: 0; border: 0; background: transparent; color: var(--ink); font-size: 12px; }
+    .song-list { display: grid; }
+    .song-row { min-height: 70px; display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; align-items: center; gap: 13px; padding: 11px 17px; border-bottom: 1px solid #edf0ec; }
+    .song-row:last-child { border-bottom: 0; }
+    .song-index { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 9px; background: #f5f6f2; color: #89948c; font-size: 11px; }
+    .song-title { font-size: 12px; font-weight: 700; }
+    .song-byline { margin-top: 3px; color: var(--muted); font-size: 10px; }
+    .song-actions { display: flex; gap: 6px; }
+    .song-actions a, .song-actions button { min-width: 32px; height: 31px; display: inline-grid; place-items: center; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px; background: #fff; text-decoration: none; color: var(--green); cursor: pointer; font-size: 11px; }
+    .song-actions a:hover, .song-actions button:hover { background: var(--green-pale); }
+    .month-switch { display: flex; align-items: center; gap: 10px; }
+    .month-title { min-width: 135px; text-align: center; font-size: 15px; font-weight: 700; }
+    .calendar { overflow: hidden; }
+    .calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+    .calendar-weekday { padding: 11px 5px; background: #fafbf9; border-bottom: 1px solid var(--line); color: var(--muted); text-align: center; font-size: 10px; font-weight: 600; }
+    .calendar-day { position: relative; min-height: 92px; padding: 9px 8px; border-right: 1px solid #edf0ec; border-bottom: 1px solid #edf0ec; cursor: pointer; }
+    .calendar-day:nth-child(7n) { border-right: 0; }
+    .calendar-day:hover { background: #fafcf9; }
+    .calendar-day.outside { color: #b9c0ba; background: #fbfcfb; }
+    .calendar-day.selected { background: #f0f7f2; box-shadow: inset 0 0 0 2px var(--green); }
+    .calendar-number { font-size: 11px; font-weight: 600; }
+    .calendar-event { margin-top: 6px; overflow: hidden; padding: 3px 5px; border-radius: 4px; background: #e8f2ed; color: #326b58; white-space: nowrap; text-overflow: ellipsis; font-size: 9px; }
+    .calendar-event.absence { background: #fff0e8; color: #a35b44; }
+    .calendar-detail { margin-top: 16px; }
+    .detail-empty { padding: 19px 0; color: var(--muted); text-align: center; font-size: 12px; }
+    .detail-row { display: flex; align-items: center; gap: 11px; padding: 10px 0; border-bottom: 1px solid #edf0ec; }
+    .detail-row:last-child { border: 0; }
+    .detail-time { width: 48px; color: var(--green); font-size: 11px; font-weight: 700; }
+    .request-list { display: grid; }
+    .request-row { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 15px; align-items: center; padding: 15px 18px; border-bottom: 1px solid #edf0ec; }
+    .request-row:last-child { border: 0; }
+    .request-title { font-size: 12px; font-weight: 700; }
+    .request-copy { margin-top: 3px; color: var(--muted); font-size: 10px; }
+    .request-meta { display: flex; gap: 8px; align-items: center; margin-top: 7px; color: #929d95; font-size: 10px; }
+    .request-state { padding: 4px 8px; border-radius: 99px; background: #fff3dc; color: #987025; font-size: 9px; white-space: nowrap; }
+    .request-state.approved { background: #e7f2eb; color: #397154; }
+    .request-state.rejected { background: #fae9e5; color: #a55242; }
+    .inline-actions { display: flex; gap: 6px; }
+    .admin-grid { grid-template-columns: minmax(0, 1.3fr) minmax(260px, .8fr); align-items: start; }
+    .member-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #edf0ec; }
+    .member-row:last-child { border: 0; }
+    .member-role { margin-left: auto; color: var(--muted); font-size: 10px; }
+    .switch { position: relative; width: 34px; height: 20px; border: 0; border-radius: 99px; background: #d7ddd8; cursor: pointer; }
+    .switch:after { content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: white; transition: transform .18s ease; }
+    .switch.on { background: var(--green); }
+    .switch.on:after { transform: translateX(14px); }
+    .field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; }
+    .field { display: grid; gap: 6px; }
+    .field.full { grid-column: 1 / -1; }
+    .field label { color: #52635a; font-size: 11px; font-weight: 600; }
+    .field input, .field select, .field textarea { width: 100%; min-height: 39px; padding: 9px 10px; border: 1px solid #dfe5de; border-radius: 7px; outline: 0; background: white; color: var(--ink); font-size: 12px; }
+    .field textarea { min-height: 86px; resize: vertical; }
+    .field input:focus, .field select:focus, .field textarea:focus { border-color: #74a48d; box-shadow: 0 0 0 3px rgba(69,135,105,.1); }
+    .theme-preview { min-height: 90px; display: grid; align-content: center; gap: 4px; margin: 13px 0; padding: 15px; border: 1px solid var(--line); border-radius: 8px; }
+    .theme-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .color-field { display: flex; align-items: center; gap: 9px; color: var(--muted); font-size: 10px; }
+    .color-field input { width: 35px; height: 30px; border: 1px solid var(--line); border-radius: 6px; padding: 2px; background: white; cursor: pointer; }
+    .empty-state { padding: 35px 15px; color: var(--muted); text-align: center; font-size: 12px; }
+    .modal-backdrop { position: fixed; inset: 0; z-index: 50; display: none; align-items: center; justify-content: center; padding: 18px; background: rgba(20, 38, 32, .42); }
+    .modal-backdrop.open { display: flex; }
+    .modal { width: min(520px, 100%); max-height: min(90vh, 760px); overflow: auto; background: white; border-radius: 12px; box-shadow: 0 25px 80px rgba(14,32,25,.22); animation: rise .2s ease-out; }
+    @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    .modal-head { display: flex; align-items: center; justify-content: space-between; padding: 17px 20px; border-bottom: 1px solid var(--line); }
+    .modal-title { font-size: 15px; font-weight: 700; }
+    .modal-body { padding: 19px 20px 21px; }
+    .modal-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+    .reason-options { display: flex; flex-wrap: wrap; gap: 7px; }
+    .reason-option { padding: 7px 10px; border: 1px solid var(--line); border-radius: 7px; background: white; color: #66736c; cursor: pointer; font-size: 11px; }
+    .reason-option.selected { border-color: var(--green); background: var(--green-pale); color: var(--green); }
+    .clock-controls { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 14px 0; }
+    .clock-dial { width: 190px; height: 190px; position: relative; border: 1px solid #dfe7df; border-radius: 50%; background: #f7faf7; }
+    .clock-center { position: absolute; top: 50%; left: 50%; width: 9px; height: 9px; border-radius: 50%; background: var(--green); transform: translate(-50%,-50%); }
+    .clock-hand { position: absolute; top: 50%; left: 50%; width: 2px; height: 60px; background: var(--green); transform-origin: 50% 0; }
+    .clock-number { position: absolute; width: 30px; height: 30px; margin: -15px; border: 0; border-radius: 50%; background: transparent; color: #496258; cursor: pointer; font-size: 11px; }
+    .clock-number.selected { color: white; background: var(--green); }
+    .ampm { display: grid; gap: 7px; }
+    .ampm button { border: 1px solid var(--line); border-radius: 7px; padding: 7px 10px; background: white; cursor: pointer; font-size: 11px; }
+    .ampm button.selected { background: var(--green-pale); color: var(--green); border-color: #a8c6b6; }
+    .clock-hint { color: var(--muted); text-align: center; font-size: 10px; }
+    .toast { position: fixed; right: 24px; bottom: 24px; z-index: 80; max-width: min(370px, calc(100vw - 32px)); padding: 12px 16px; background: #1d3831; color: white; border-radius: 8px; box-shadow: var(--shadow); font-size: 12px; opacity: 0; transform: translateY(8px); pointer-events: none; transition: .2s ease; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .auth-gate { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 20px; background: var(--page); }
+    .auth-gate[hidden] { display: none; }
+    .auth-panel { width: min(410px, 100%); padding: 30px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); }
+    .auth-panel h1 { margin-top: 20px; font-size: 22px; }
+    .auth-message { margin: 8px 0 20px; color: var(--muted); font-size: 12px; }
+    .auth-error { margin-top: 13px; color: #b65743; font-size: 11px; }
+    .auth-panel .primary-button { width: 100%; }
+    .drawer-scrim { display: none; }
+    @media (max-width: 1050px) {
+      .sidebar { width: 226px; }
+      .main { margin-left: 226px; }
+      .content { padding-right: 25px; padding-left: 25px; }
+      .topbar { padding: 0 25px; }
+      .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 760px) {
+      .sidebar { width: 275px; transform: translateX(-100%); box-shadow: none; }
+      .sidebar.open { transform: translateX(0); box-shadow: 20px 0 50px rgba(24,46,36,.12); }
+      .drawer-scrim.open { display: block; position: fixed; inset: 0; z-index: 19; background: rgba(21,37,31,.32); }
+      .main { margin-left: 0; }
+      .topbar { height: 62px; padding: 0 16px; }
+      .mobile-menu { display: inline-grid; place-items: center; margin-right: 9px; }
+      .top-left { display: flex; align-items: center; }
+      .today-label { display: none; }
+      .content { padding: 23px 15px 38px; }
+      .welcome-row { align-items: flex-start; }
+      h1 { font-size: 22px; }
+      .welcome-row > .primary-button { padding: 0 10px; }
+      .home-grid, .admin-grid { grid-template-columns: 1fr; }
+      .calendar-day { min-height: 70px; padding: 6px 4px; }
+      .calendar-event { padding: 2px; font-size: 8px; }
+      .song-row { grid-template-columns: 34px minmax(0,1fr) auto; gap: 8px; padding: 10px; }
+      .song-actions { gap: 4px; }
+      .song-actions a, .song-actions button { min-width: 29px; padding: 0 6px; }
+    }
+    @media (max-width: 440px) {
+      .stats-grid { gap: 9px; }
+      .stat-card { min-height: 100px; padding: 12px; }
+      .stat-number { font-size: 21px; }
+      .welcome-row { gap: 7px; }
+      .welcome-row .primary-button { font-size: 10px; }
+      .page-toolbar { align-items: flex-start; flex-direction: column; }
+      .search-box { width: 100%; }
+      .field-grid { grid-template-columns: 1fr; }
+      .field.full { grid-column: auto; }
+      .calendar-day { min-height: 58px; }
+      .calendar-event { max-height: 18px; }
+      .request-row { grid-template-columns: 1fr; }
+      .inline-actions { justify-content: flex-end; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand"><div class="brand-mark">T</div><div><div class="brand-name">tutti</div><div class="brand-caption">部活の毎日を、ひとつに。</div></div></div>
+      <button class="club-switch" id="clubSwitch" title="所属グループ">
+        <span class="club-avatar" id="clubAvatar">♪</span><span><span class="club-name" id="clubName">読み込み中</span><br><span class="club-school" id="schoolName">所属を確認しています</span></span><span class="club-arrow">⌄</span>
+      </button>
+      <div class="nav-label">メニュー</div>
+      <nav class="nav-list" aria-label="メインメニュー">
+        <button class="nav-item active" data-page="home"><span class="nav-icon">⌂</span>ホーム</button>
+        <button class="nav-item" data-page="calendar"><span class="nav-icon">▦</span>カレンダー</button>
+        <button class="nav-item" data-page="library"><span class="nav-icon">♫</span>楽譜・音源</button>
+      </nav>
+      <div class="nav-divider"></div>
+      <div class="nav-label">連絡フォーム</div>
+      <nav class="nav-list" aria-label="連絡フォーム">
+        <button class="nav-item" data-form="absence"><span class="nav-icon">◷</span>遅刻・欠席連絡</button>
+        <button class="nav-item" data-form="purchase"><span class="nav-icon">＋</span>購入・修理希望</button>
+        <button class="nav-item" data-form="lost"><span class="nav-icon">⌕</span>落とし物を報告</button>
+      </nav>
+      <div id="adminNav"></div>
+      <div class="sidebar-bottom">
+        <div class="storage-note"><span>◉</span><span id="clubStorageName">所属団体<br>部員の情報をひとつに管理</span></div>
+        <div class="user-row"><div class="user-avatar" id="userAvatar">♪</div><div><div class="user-name" id="userName">読み込み中</div><div class="user-role" id="userRole">認証中</div></div><button class="user-menu" id="signOutButton" title="ログアウト" aria-label="ログアウト">↪</button></div>
+      </div>
+    </aside>
+    <div class="drawer-scrim" id="scrim"></div>
+    <main class="main">
+      <header class="topbar">
+        <div class="top-left"><button class="icon-button mobile-menu" id="menuButton" aria-label="メニューを開く">☰</button><div class="crumb"><span id="crumbSchool">Tutti</span> / <strong id="crumbTitle">ホーム</strong></div></div>
+        <div class="top-actions"><span class="today-label" id="topDate"></span><button class="icon-button" id="noticeButton" title="連絡フォームを開く" aria-label="連絡フォーム">＋</button><div class="user-avatar" id="topUserAvatar" style="width:31px;height:31px;font-size:11px">♪</div></div>
+      </header>
+      <section class="content" id="content"></section>
+    </main>
+  </div>
+  <div class="modal-backdrop" id="modalBackdrop" role="presentation"><section class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"></section></div>
+  <div class="toast" id="toast" role="status"></div>
+  <div class="auth-gate" id="authGate" aria-live="polite"></div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = 'https://wqdrpyrblirifljccyua.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_0DnFWVsGjn85uZpZwoFrNw_EGNoij_t';
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const dayKey = date => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+    const japanDateKey = value => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(value));
+    const shiftDay = offset => { const date = new Date(); date.setDate(date.getDate()+offset); return dayKey(date); };
+    const seed = {
+      isAdmin: true,
+      theme: { page: '#f3f5ef', ink: '#19332f', font: 'DM Sans' },
+      events: [
+        { date: shiftDay(0), title: '合奏練習', time: '16:00', place: '音楽室', detail: '文化祭ステージに向けた全体合奏' },
+        { date: shiftDay(2), title: 'パート練習', time: '15:45', place: '音楽室・各教室', detail: '木管・金管に分かれて練習' },
+        { date: shiftDay(5), title: '合奏練習', time: '13:30', place: '音楽室', detail: '定期演奏会 第2部' },
+        { date: shiftDay(-3), title: '基礎合奏', time: '16:00', place: '音楽室', detail: 'ロングトーン・チューニング' }
+      ],
+      notices: [
+        { title: '定期演奏会の係決めについて', body: '今週金曜日までに希望の係をフォームに入力してください。', date: shiftDay(-1), mark: '♪' },
+        { title: '譜面台の返却をお願いします', body: '倉庫前に置いた譜面台は今日中に片付けましょう。', date: shiftDay(-2), mark: '!' }
+      ],
+      absences: [
+        { name: '田中 美咲', detail: '体調不良 · 今日はお休み', date: shiftDay(0) },
+        { name: '小林 蓮', detail: '習い事 · 17:30頃到着', date: shiftDay(0) },
+        { name: '山本 葵', detail: '公欠 · 大会参加', date: shiftDay(2) },
+        { name: '伊藤 湊', detail: '家の用事 · お休み', date: shiftDay(-3) }
+      ],
+      meters: [{ name: 'メトロノーム A', status: '貸出中 · 田中さん' }, { name: 'メトロノーム B', status: '貸出できます' }, { name: 'メトロノーム C', status: '貸出できます' }],
+      lost: { title: '黒い譜面ファイル', body: '音楽室の窓際で見つかりました。持ち主の方は部長まで。', image: 'https://images.unsplash.com/photo-1516979187457-637abb4f9353?auto=format&fit=crop&w=440&q=80', date: shiftDay(-1) },
+      requests: [
+        { id: 1, type: '遅刻・欠席', title: '今日の練習を欠席します', body: '体調不良のためお休みします。', name: '田中 美咲', date: shiftDay(0), status: '確認待ち' },
+        { id: 2, type: '購入・修理', title: 'クラリネットのリードケース', body: 'ケースの留め具が壊れてしまいました。', name: '高橋 凛', date: shiftDay(-1), status: '確認待ち' },
+        { id: 3, type: '落とし物', title: '水色のタオル', body: '音楽室の後ろの席で見つけました。', name: '渡辺 悠', date: shiftDay(-2), status: '対応済み' }
+      ],
+      members: [{ name: '佐藤 ひかり', role: true }, { name: '鈴木 颯太', role: true }, { name: '田中 美咲', role: false }, { name: '小林 蓮', role: false }, { name: '高橋 凛', role: false }, { name: '山本 葵', role: false }],
+      songs: [
+        { id: 'song-1', title: 'アルセナール', byline: 'ヤン・ヴァンデルロースト', sortKey: 'Arsenale', drive: 'https://drive.google.com/', youtube: 'https://www.youtube.com/results?search_query=Arsenal+Van+der+Roost' },
+        { id: 'song-2', title: '宝島', byline: '和泉 宏隆 / 真島 俊夫 編曲', sortKey: 'Takarajima', drive: 'https://drive.google.com/', youtube: 'https://www.youtube.com/results?search_query=Takarajima+wind+orchestra' },
+        { id: 'song-3', title: 'ディープ・パープル・メドレー', byline: '佐橋 俊彦 編曲', sortKey: 'Deep Purple Medley', drive: 'https://drive.google.com/', youtube: 'https://www.youtube.com/results?search_query=Deep+Purple+Medley+wind+orchestra' },
+        { id: 'song-4', title: 'マードックからの最後の手紙', byline: '樽屋 雅徳', sortKey: 'The Last Letter from Murdoch', drive: 'https://drive.google.com/', youtube: 'https://www.youtube.com/results?search_query=Murdoch+wind+orchestra' },
+        { id: 'song-5', title: '銀河鉄道999', byline: 'タケカワ ユキヒデ / 樽屋 雅徳 編曲', sortKey: 'Galaxy Express 999', drive: 'https://drive.google.com/', youtube: 'https://www.youtube.com/results?search_query=Galaxy+Express+999+wind+orchestra' }
+      ]
+    };
+    const emptyWorkspace = () => ({ isAdmin: false, schoolId: null, schoolName: '', clubName: '', userName: '', userId: null, theme: { page: '#f3f5ef', ink: '#19332f', font: 'DM Sans' }, events: [], notices: [], absences: [], meters: [], lost: null, requests: [], members: [], songs: [] });
+    let data = emptyWorkspace();
+    let currentSession = null;
+    let currentProfile = null;
+    let realtimeChannel = null;
+    let loadSequence = 0;
+    let authMessage = '';
+    let authMode = 'signin';
+    let activePage = 'home';
+    let calendarDate = new Date();
+    let selectedDate = dayKey(new Date());
+    let selectedReason = '体調不良';
+    let absenceKind = '欠席';
+    let clockHour = 4;
+    let clockPeriod = '午後';
+    let toastTimer;
+    const content = document.getElementById('content');
+    const modalBackdrop = document.getElementById('modalBackdrop');
+    const modal = document.getElementById('modal');
+    const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[char]);
+    const dateLabel = value => new Intl.DateTimeFormat('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' }).format(new Date(`${value}T12:00:00`));
+    const initials = name => name.replace(/\s/g, '').slice(0,1);
+    const setTheme = () => {
+      document.documentElement.style.setProperty('--page', data.theme.page || '#f3f5ef');
+      document.documentElement.style.setProperty('--ink', data.theme.ink || '#19332f');
+      const font = data.theme.font === 'Noto Sans JP' ? '"Noto Sans JP", sans-serif' : '"DM Sans", "Noto Sans JP", sans-serif';
+      document.documentElement.style.setProperty('--font', font);
+    };
+    const checkedData = result => {
+      if (result.error) throw result.error;
+      return result.data;
+    };
+    async function readRows(query, tableName) {
+      const { data: rows, error } = await query;
+      if (error) {
+        if (error.code === 'PGRST205' || error.code === '42P01') {
+          console.warn(`Optional table ${tableName} is unavailable; using an empty list.`);
+          return [];
+        }
+        throw error;
+      }
+      return Array.isArray(rows) ? rows : [];
+    }
+    async function readOptionalRow(query, tableName) {
+      const { data: row, error } = await query;
+      if (error) {
+        if (error.code === 'PGRST205' || error.code === '42P01') {
+          console.warn(`Optional table ${tableName} is unavailable; using defaults.`);
+          return null;
+        }
+        throw error;
+      }
+      return row || null;
+    }
+    const reportKindLabel = kind => ({ absence: '遅刻・欠席', purchase_repair: '購入・修理', lost_found: '落とし物' }[kind] || kind);
+    const reportStatusLabel = status => ({ pending: '確認待ち', approved: '確認済み', rejected: '却下', resolved: '対応済み' }[status] || status);
+    const formatPart = part => String(part || '').split(/[,、，／]|\s\/\s/).map(value => value.trim()).filter(Boolean).join(' / ');
+    const toJapanTime = value => new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(value));
+    async function loadWorkspace(user) {
+      const sequence = ++loadSequence;
+      const profile = checkedData(await supabaseClient.from('profiles').select('id, school_id, full_name, part, is_admin').eq('id', user.id).maybeSingle());
+      if (sequence !== loadSequence) return;
+      if (!profile) {
+        currentProfile = null;
+        authMessage = 'このメールアドレスの部員プロフィールがありません。アカウント登録後、部活管理者に名簿への追加を依頼してください。';
+        render();
+        return;
+      }
+      currentProfile = profile;
+      const schoolId = profile.school_id;
+      data.schoolId = schoolId;
+      const metadata = user.user_metadata || {};
+      const registeredParts = [metadata.part_primary, metadata.part_secondary].filter(Boolean).join(' / ');
+      if (!profile.part && registeredParts) {
+        checkedData(await supabaseClient.from('profiles').update({ part: registeredParts }).eq('id', user.id).eq('school_id', schoolId));
+        profile.part = registeredParts;
+      }
+      const [school, members, scheduleRows, reports, songRows, announcementRows, settingsData, equipmentRows] = await Promise.all([
+        supabaseClient.from('schools').select('id, school_name, club_name').eq('id', schoolId).single(),
+        readRows(supabaseClient.from('profiles').select('id, full_name, part, is_admin').eq('school_id', schoolId).order('full_name'), 'profiles'),
+        readRows(supabaseClient.from('schedules').select('id, title, content, starts_at, ends_at, location').eq('school_id', schoolId).order('starts_at'), 'schedules'),
+        readRows(supabaseClient.from('reports').select('id, reporter_id, kind, report_date, title, reason, arrival_at, photo_url, status, created_at').eq('school_id', schoolId).order('created_at', { ascending: false }), 'reports'),
+        readRows(supabaseClient.from('songs').select('id, title, sort_reading, composer, arranger, drive_url, youtube_url, audio_file_path').eq('school_id', schoolId), 'songs'),
+        readRows(supabaseClient.from('announcements').select('id, title, body, created_at').eq('school_id', schoolId).order('created_at', { ascending: false }), 'announcements'),
+        readOptionalRow(supabaseClient.from('club_settings').select('theme_page, theme_ink, theme_font').eq('school_id', schoolId).maybeSingle(), 'club_settings'),
+        readRows(supabaseClient.from('equipment').select('id, name, borrower_id').eq('school_id', schoolId).order('name'), 'equipment')
+      ]);
+      if (sequence !== loadSequence) return;
+      const schoolData = checkedData(school);
+      const reportsForView = await Promise.all(reports.map(async report => {
+        let photoUrl = '';
+        if (report.photo_url) {
+          const signed = await supabaseClient.storage.from('report-photos').createSignedUrl(report.photo_url, 3600);
+          if (!signed.error) photoUrl = signed.data.signedUrl;
+        }
+        return { ...report, photoUrl };
+      }));
+      data = {
+        ...data,
+        schoolId,
+        schoolName: schoolData.school_name,
+        clubName: schoolData.club_name,
+        userName: profile.full_name,
+        userId: profile.id,
+        isAdmin: profile.is_admin,
+        members: members.map(member => ({ id: member.id, name: member.full_name, part: formatPart(member.part), role: member.is_admin })),
+        events: scheduleRows.map(item => ({ id: item.id, date: japanDateKey(item.starts_at), time: toJapanTime(item.starts_at), title: item.title, place: item.location, detail: item.content })),
+        requests: reportsForView.map(item => ({ id: item.id, dbStatus: item.status, type: reportKindLabel(item.kind), kind: item.kind, title: item.title, body: [item.reason, item.arrival_at ? `到着予定 ${item.arrival_at.slice(0,5)}` : ''].filter(Boolean).join(' · '), name: members.find(member => member.id === item.reporter_id)?.full_name || '部員', date: item.report_date, status: reportStatusLabel(item.status), photoPath: item.photo_url, photoUrl: item.photoUrl })),
+        absences: reports.filter(item => item.kind === 'absence').map(item => ({ id: item.id, name: members.find(member => member.id === item.reporter_id)?.full_name || '部員', detail: [item.reason, item.arrival_at ? `到着予定 ${item.arrival_at.slice(0,5)}` : '欠席'].filter(Boolean).join(' · '), date: item.report_date })),
+        songs: songRows.map(item => ({ id: item.id, title: item.title, byline: [item.composer, item.arranger && `${item.arranger} 編曲`].filter(Boolean).join(' / '), sortKey: item.sort_reading, drive: item.drive_url, youtube: item.youtube_url, audioKey: item.audio_file_path })),
+        notices: announcementRows.map(item => ({ id: item.id, title: item.title, body: item.body, date: japanDateKey(item.created_at), mark: '♪' })),
+        theme: settingsData ? { page: settingsData.theme_page, ink: settingsData.theme_ink, font: settingsData.theme_font } : { page: '#f3f5ef', ink: '#19332f', font: 'DM Sans' },
+        meters: equipmentRows.map(item => ({ id: item.id, name: item.name, status: item.borrower_id ? `貸出中 · ${members.find(member => member.id === item.borrower_id)?.full_name || '部員'}` : '貸出できます' })),
+        lost: { title: '落とし物の報告はありません', body: '', image: '', date: dayKey(new Date()) }
+      };
+      const lostReport = reportsForView.find(item => item.kind === 'lost_found' && item.status !== 'rejected');
+      if (lostReport) {
+        data.lost = { title: lostReport.title, body: lostReport.reason, image: lostReport.photoUrl, date: lostReport.report_date };
+      }
+      if (sequence !== loadSequence) return;
+      authMessage = '';
+      subscribeToWorkspace(schoolId);
+      render();
+    }
+    function subscribeToWorkspace(schoolId) {
+      if (realtimeChannel) supabaseClient.removeChannel(realtimeChannel);
+      let refreshTimer;
+      const refresh = () => {
+        clearTimeout(refreshTimer);
+        refreshTimer = setTimeout(() => {
+          if (currentSession?.user) loadWorkspace(currentSession.user).catch(handleWorkspaceError);
+        }, 180);
+      };
+      const channel = supabaseClient.channel(`school:${schoolId}`);
+      for (const table of ['profiles', 'schedules', 'reports', 'songs', 'announcements', 'club_settings', 'equipment']) {
+        channel.on('postgres_changes', { event: '*', schema: 'public', table, filter: `school_id=eq.${schoolId}` }, refresh);
+      }
+      channel.on('postgres_changes', { event: '*', schema: 'public', table: 'schools', filter: `id=eq.${schoolId}` }, refresh);
+      realtimeChannel = channel.subscribe(status => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') showToast('Realtime接続を再試行しています');
+      });
+    }
+    function renderAuthGate() {
+      const signedIn = Boolean(currentSession?.user);
+      document.getElementById('authGate').hidden = false;
+      const registering = authMode === 'signup';
+      const title = signedIn ? '部活プロフィールを確認' : registering ? '新規部員登録' : 'Tutti にログイン';
+      const message = authMessage || (signedIn ? '所属団体のデータを読み込んでいます。' : registering ? '登録後、部活管理者に名簿への追加を依頼してください。' : 'メールアドレスとパスワードでログインしてください。');
+      const partFields = registering ? '<div class="field"><label for="authPartPrimary">メインパート（パート1）</label><input id="authPartPrimary" name="partPrimary" autocomplete="off" placeholder="例：Alto Sax" required></div><div class="field"><label for="authPartSecondary">サブパート（パート2・任意）</label><input id="authPartSecondary" name="partSecondary" autocomplete="off" placeholder="例：Piano"></div>' : '';
+      const nameField = registering ? '<div class="field full"><label for="authFullName">氏名</label><input id="authFullName" name="fullName" autocomplete="name" required></div>' : '';
+      const signedInActions = '<button class="secondary-button" data-auth-action="sign-out">ログアウト</button>';
+      const authForm = `<form id="authForm" class="field-grid">${nameField}${partFields}<div class="field full"><label for="authEmail">メールアドレス</label><input id="authEmail" name="email" type="email" autocomplete="email" required></div><div class="field full"><label for="authPassword">パスワード</label><input id="authPassword" name="password" type="password" autocomplete="${registering ? 'new-password' : 'current-password'}" minlength="6" required></div><div class="field full"><button class="primary-button" type="submit">${registering ? '登録する' : 'ログイン'}</button></div></form><button class="secondary-button" style="width:100%;margin-top:9px" data-auth-action="toggle-mode">${registering ? 'ログイン画面に戻る' : '新規部員登録'}</button>`;
+      document.getElementById('authGate').innerHTML = `<section class="auth-panel"><div class="brand" style="padding:0"><div class="brand-mark">T</div><div><div class="brand-name">tutti</div><div class="brand-caption">部活の毎日を、ひとつに。</div></div></div><h1>${title}</h1><p class="auth-message">${escapeHtml(message)}</p>${signedIn ? signedInActions : authForm}<div class="auth-error" id="authError"></div></section>`;
+    }
+    function handleWorkspaceError(error) {
+      console.error('Supabase workspace load failed', error);
+      authMessage = 'Supabaseからデータを取得できませんでした。SQLの適用状態と接続設定を確認してください。';
+      currentProfile = null;
+      render();
+    }
+    async function applySession(session) {
+      currentSession = session;
+      if (realtimeChannel) { supabaseClient.removeChannel(realtimeChannel); realtimeChannel = null; }
+      currentProfile = null;
+      loadSequence++;
+      data = emptyWorkspace();
+      if (!session?.user) {
+        authMode = 'signin';
+        authMessage = '';
+        render();
+        return;
+      }
+      authMessage = '所属団体のデータを読み込んでいます。';
+      render();
+      try { await loadWorkspace(session.user); } catch (error) { handleWorkspaceError(error); }
+    }
+    const setActiveNav = page => {
+      document.querySelectorAll('.nav-item[data-page]').forEach(item => item.classList.toggle('active', item.dataset.page === page));
+      const labels = { home: 'ホーム', calendar: 'カレンダー', library: '楽譜・音源', admin: '管理者画面' };
+      document.getElementById('crumbTitle').textContent = labels[page] || 'ホーム';
+    };
+    function render() {
+      setTheme();
+      if (!currentSession?.user || !currentProfile) {
+        renderAuthGate();
+        return;
+      }
+      document.getElementById('authGate').hidden = true;
+      setActiveNav(activePage);
+      document.getElementById('topDate').textContent = new Intl.DateTimeFormat('ja-JP', { year:'numeric', month:'long', day:'numeric', weekday:'short' }).format(new Date());
+      document.getElementById('adminNav').innerHTML = data.isAdmin ? '<div class="nav-divider"></div><div class="nav-label">運営</div><button class="nav-item" data-page="admin"><span class="nav-icon">⚙</span>管理者画面<span class="nav-badge">'+data.requests.filter(item => item.status === '確認待ち').length+'</span></button>' : '';
+      document.getElementById('clubName').textContent = data.clubName;
+      document.getElementById('schoolName').textContent = data.schoolName;
+      document.getElementById('clubStorageName').innerHTML = `${escapeHtml(data.schoolName)} ${escapeHtml(data.clubName)}<br>部員の情報をひとつに管理`;
+      document.getElementById('clubAvatar').textContent = initials(data.schoolName || data.clubName || '♪');
+      document.getElementById('crumbSchool').textContent = data.schoolName;
+      document.getElementById('userName').textContent = data.userName;
+      document.getElementById('userAvatar').textContent = initials(data.userName || '♪');
+      document.getElementById('topUserAvatar').textContent = initials(data.userName || '♪');
+      document.getElementById('userRole').textContent = data.isAdmin ? '部活管理者' : '部員';
+      if (activePage === 'home') renderHome();
+      if (activePage === 'calendar') renderCalendar();
+      if (activePage === 'library') renderLibrary();
+      if (activePage === 'admin') data.isAdmin ? renderAdmin() : (activePage = 'home', render());
+    }
+    function renderHome() {
+      const todayKey = dayKey(new Date());
+      const todayEvent = data.events.find(event => event.date === todayKey);
+      const todayAbsences = data.absences.filter(item => item.date === todayKey);
+      const available = data.meters.filter(item => item.status.includes('できます')).length;
+      content.innerHTML = `
+        <div class="welcome-row"><div><div class="eyebrow">${escapeHtml(dateLabel(todayKey))}</div><h1>おはよう、${escapeHtml(data.userName)}さん</h1><div class="subheading">${escapeHtml(data.schoolName)} · ${escapeHtml(data.clubName)}</div></div><button class="primary-button" data-form="absence">＋　連絡する</button></div>
+        <div class="grid stats-grid">
+          <div class="stat-card"><div class="stat-top">今日の部員 <span class="stat-symbol">♧</span></div><div class="stat-number">${Math.max(data.members.length-todayAbsences.length,0)}<span style="font-size:13px;font-weight:500"> / ${data.members.length}</span></div><div class="stat-foot">出席予定</div></div>
+          <div class="stat-card"><div class="stat-top">今日の欠席・遅刻 <span class="stat-symbol" style="background:#fff0e9;color:#b56a4c">◷</span></div><div class="stat-number">${todayAbsences.length}<span style="font-size:13px;font-weight:500"> 名</span></div><div class="stat-foot">事前連絡を含む</div></div>
+          <div class="stat-card"><div class="stat-top">貸出可能 <span class="stat-symbol" style="background:#fff5da;color:#9a782c">♩</span></div><div class="stat-number">${available}<span style="font-size:13px;font-weight:500"> 台</span></div><div class="stat-foot">メトロノーム</div></div>
+          <div class="stat-card"><div class="stat-top">未確認の連絡 <span class="stat-symbol" style="background:#fcece8;color:#b75f4c">✉</span></div><div class="stat-number">${data.requests.filter(item => item.status === '確認待ち').length}<span style="font-size:13px;font-weight:500"> 件</span></div><div class="stat-foot">運営チームが確認します</div></div>
+        </div>
+        <div class="grid home-grid">
+          <div class="stack">
+            <section class="panel"><div class="panel-head"><div><div class="panel-title">本日の練習</div><div class="panel-note">みんなで合わせる時間</div></div><button class="quiet-button" data-page="calendar">カレンダー →</button></div><div class="panel-body">${todayEvent ? `<div class="practice-card"><div class="practice-date">${escapeHtml(dateLabel(todayEvent.date))}</div><div class="practice-title">${escapeHtml(todayEvent.title)}</div><div class="practice-meta"><span>◷ ${escapeHtml(todayEvent.time)} — 18:30</span><span>⌖ ${escapeHtml(todayEvent.place)}</span></div></div><div class="panel-note" style="margin-top:11px">${escapeHtml(todayEvent.detail || '')}</div>` : '<div class="empty-state">今日は練習予定がありません。</div>'}</div></section>
+            <section class="panel"><div class="panel-head"><div><div class="panel-title">全体連絡</div><div class="panel-note">部員みんなへのお知らせ</div></div><span class="panel-note">${data.notices.length}件</span></div><div class="panel-body">${data.notices.length ? data.notices.slice(0,3).map(item => `<div class="announcement"><div class="announcement-mark">${escapeHtml(item.mark || '♪')}</div><div><div class="announcement-title">${escapeHtml(item.title)}</div><div class="announcement-copy">${escapeHtml(item.body)}</div><div class="announcement-date">${escapeHtml(dateLabel(item.date))}</div></div></div>`).join('') : '<div class="empty-state">新しい連絡はありません。</div>'}</div></section>
+            <section class="panel"><div class="panel-head"><div><div class="panel-title">今日の欠席・遅刻</div><div class="panel-note">事前に届いた連絡</div></div><button class="quiet-button" data-page="calendar">履歴を見る →</button></div><div class="panel-body">${todayAbsences.length ? `<div class="person-list">${todayAbsences.map(item => `<div class="person-row"><div class="mini-avatar">${escapeHtml(initials(item.name))}</div><div class="person-info"><div class="person-name">${escapeHtml(item.name)}</div><div class="person-detail">${escapeHtml(item.detail)}</div></div><span class="person-tag">連絡済み</span></div>`).join('')}</div>` : '<div class="empty-state">欠席・遅刻の連絡はありません。</div>'}</div></section>
+          </div>
+          <div class="stack">
+            <section class="panel"><div class="panel-head"><div><div class="panel-title">メトロノーム</div><div class="panel-note">貸出状況</div></div><span class="panel-note">${available} / ${data.meters.length}台 空き</span></div><div class="panel-body">${data.meters.map(item => `<div class="meter-row"><div class="meter-icon">♩</div><div class="meter-info"><div class="meter-name">${escapeHtml(item.name)}</div><div class="meter-status">${escapeHtml(item.status)}</div></div><span class="status-dot" style="background:${item.status.includes('できます')?'#67a884':'#e4ad55'}"></span></div>`).join('')}</div></section>
+            <section class="panel"><div class="panel-head"><div><div class="panel-title">落とし物のお知らせ</div><div class="panel-note">心当たりはありませんか？</div></div><button class="quiet-button" data-form="lost">報告する</button></div><div class="panel-body"><div class="lost-feature"><img class="lost-image" src="${escapeHtml(data.lost.image)}" alt="${escapeHtml(data.lost.title)}" onerror="this.src='https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=440&q=80'"><div><div class="lost-title">${escapeHtml(data.lost.title)}</div><div class="lost-copy">${escapeHtml(data.lost.body)}</div><div class="lost-date">${escapeHtml(dateLabel(data.lost.date))}</div></div></div></div></section>
+            <section class="panel"><div class="panel-head"><div><div class="panel-title">今週の予定</div><div class="panel-note">次の合奏まであと少し</div></div></div><div class="panel-body">${data.events.filter(item => item.date >= todayKey).slice(0,3).map(item => `<div class="detail-row"><div class="detail-time">${escapeHtml(new Date(`${item.date}T12:00:00`).getDate())}日</div><div class="person-info"><div class="person-name">${escapeHtml(item.title)}</div><div class="person-detail">${escapeHtml(item.time)} · ${escapeHtml(item.place)}</div></div></div>`).join('') || '<div class="empty-state">予定はありません。</div>'}</div></section>
+          </div>
+        </div>`;
+    }
+    function renderCalendar() {
+      const year = calendarDate.getFullYear(), month = calendarDate.getMonth();
+      const first = new Date(year, month, 1), start = new Date(year, month, 1-first.getDay());
+      const cells = Array.from({ length: 42 }, (_, index) => { const date = new Date(start); date.setDate(start.getDate()+index); return date; });
+      const weekdays = ['日','月','火','水','木','金','土'];
+      const dayCells = cells.map(date => {
+        const key = dayKey(date), isCurrent = date.getMonth() === month;
+        const events = data.events.filter(item => item.date === key);
+        const absences = data.absences.filter(item => item.date === key);
+        return `<div class="calendar-day ${isCurrent?'':'outside'} ${selectedDate===key?'selected':''}" data-date="${key}"><div class="calendar-number">${date.getDate()}</div>${events.slice(0,1).map(item => `<div class="calendar-event">${escapeHtml(item.title)}</div>`).join('')}${absences.length ? `<div class="calendar-event absence">欠席 ${absences.length}名</div>` : ''}</div>`;
+      }).join('');
+      const dateEvents = data.events.filter(item => item.date === selectedDate);
+      const dateAbsences = data.absences.filter(item => item.date === selectedDate);
+      content.innerHTML = `<div class="welcome-row"><div><div class="eyebrow">SCHEDULE</div><h1>カレンダー</h1><div class="subheading">練習予定と、部員の出欠を確認できます。</div></div><button class="primary-button" data-form="absence">＋　欠席を連絡</button></div>
+        <div class="panel calendar"><div class="panel-head"><div class="month-switch"><button class="icon-button" data-month="-1" aria-label="前の月">‹</button><div class="month-title">${year}年 ${month+1}月</div><button class="icon-button" data-month="1" aria-label="次の月">›</button></div><button class="secondary-button" data-month="today">今日</button></div><div class="calendar-grid">${weekdays.map(day => `<div class="calendar-weekday">${day}</div>`).join('')}${dayCells}</div></div>
+        <section class="panel calendar-detail"><div class="panel-head"><div><div class="panel-title">${escapeHtml(dateLabel(selectedDate))}の予定と出欠</div><div class="panel-note">過去の履歴・未来の欠席予定も確認できます</div></div></div><div class="panel-body">${dateEvents.map(item => `<div class="detail-row"><div class="detail-time">${escapeHtml(item.time)}</div><div class="person-info"><div class="person-name">${escapeHtml(item.title)}</div><div class="person-detail">${escapeHtml(item.place)} · ${escapeHtml(item.detail)}</div></div></div>`).join('')}${dateAbsences.map(item => `<div class="detail-row"><div class="detail-time">${escapeHtml(item.name.split(' ')[0])}</div><div class="person-info"><div class="person-name">${escapeHtml(item.name)} · 欠席/遅刻</div><div class="person-detail">${escapeHtml(item.detail)}</div></div></div>`).join('')}${!dateEvents.length&&!dateAbsences.length?'<div class="detail-empty">この日の予定・連絡はありません。</div>':''}</div></section>`;
+    }
+    function renderLibrary(query = '') {
+      const collator = new Intl.Collator('en', { sensitivity: 'base', numeric: true });
+      const songs = data.songs.filter(item => `${item.title} ${item.byline}`.toLowerCase().includes(query.toLowerCase())).sort((a,b) => collator.compare(a.sortKey || a.title, b.sortKey || b.title));
+      content.innerHTML = `<div class="welcome-row"><div><div class="eyebrow">MUSIC LIBRARY</div><h1>楽譜・音源</h1><div class="subheading">部のレパートリーを、いつでも手元に。</div></div>${data.isAdmin?'<button class="primary-button" data-action="add-song">＋　曲を追加</button>':''}</div>
+        <div class="page-toolbar"><label class="search-box"><span>⌕</span><input id="songSearch" type="search" placeholder="曲名・作曲者で検索" value="${escapeHtml(query)}"></label><span class="panel-note">${songs.length} 曲 · A–Z順</span></div>
+        <section class="panel"><div class="panel-head"><div><div class="panel-title">レパートリー</div><div class="panel-note">曲名 · 作曲・編曲者</div></div></div><div class="song-list">${songs.map((item,index) => `<div class="song-row"><div class="song-index">${String(index+1).padStart(2,'0')}</div><div><div class="song-title">${escapeHtml(item.title)}</div><div class="song-byline">${escapeHtml(item.byline)}</div></div><div class="song-actions">${item.audioKey?`<button data-action="play-song" data-id="${escapeHtml(item.id)}" title="音源を再生" aria-label="音源を再生">▶</button>`:`<a href="${escapeHtml(item.youtube || '#')}" target="_blank" rel="noopener" title="YouTubeで参考音源を開く">▶</a>`}<a href="${escapeHtml(item.drive || '#')}" target="_blank" rel="noopener" title="Google Driveの楽譜を開く">↗</a>${data.isAdmin?`<button data-action="edit-song" data-id="${escapeHtml(item.id)}" title="曲を編集">✎</button>`:''}</div></div>`).join('')||'<div class="empty-state">曲が見つかりませんでした。</div>'}</div></section>`;
+      const search = document.getElementById('songSearch');
+      if (search) search.addEventListener('input', event => { const position = event.target.selectionStart; renderLibrary(event.target.value); const next = document.getElementById('songSearch'); next.focus(); next.setSelectionRange(position,position); });
+    }
+    function renderAdmin() {
+      const pending = data.requests.filter(item => item.status === '確認待ち');
+      content.innerHTML = `<div class="welcome-row"><div><div class="eyebrow">CLUB MANAGEMENT</div><h1>管理者画面</h1><div class="subheading">${escapeHtml(data.schoolName)} · ${escapeHtml(data.clubName)}の運営を管理します。</div></div></div>
+        <div class="grid admin-grid"><div class="stack">
+          <section class="panel"><div class="panel-head"><div><div class="panel-title">連絡フォームの投稿</div><div class="panel-note">確認待ち ${pending.length}件 · 投稿を承認または対応済みにできます</div></div></div><div class="request-list">${data.requests.length?data.requests.map(item => `<div class="request-row"><div><div class="request-title">${escapeHtml(item.title)}</div><div class="request-copy">${escapeHtml(item.body)}</div><div class="request-meta"><span>${escapeHtml(item.type)}</span><span>·</span><span>${escapeHtml(item.name)}</span><span>·</span><span>${escapeHtml(dateLabel(item.date))}</span></div></div><div class="inline-actions"><span class="request-state ${item.status==='対応済み'?'approved':item.status==='却下'?'rejected':''}">${escapeHtml(item.status)}</span>${item.status==='確認待ち'?`<button class="secondary-button" data-action="request-status" data-id="${item.id}" data-status="対応済み">確認</button><button class="danger-button" data-action="request-status" data-id="${item.id}" data-status="却下">却下</button>`:''}</div></div>`).join(''):'<div class="empty-state">新しい投稿はありません。</div>'}</div></section>
+          <section class="panel"><div class="panel-head"><div><div class="panel-title">部員と権限</div><div class="panel-note">幹部級の管理者権限を設定</div></div><span class="panel-note">${data.members.length}名</span></div><div class="panel-body">${data.members.map((member,index) => `<div class="member-row"><div class="mini-avatar">${escapeHtml(initials(member.name))}</div><div class="person-info"><div class="person-name">${escapeHtml(member.name)}</div><div class="person-detail">${escapeHtml(member.part || 'パート未設定')}</div></div><span class="member-role">${member.role?'幹部':'部員'}</span><button class="switch ${member.role?'on':''}" data-action="member-role" data-index="${index}" aria-label="${escapeHtml(member.name)}の管理者権限"></button></div>`).join('')}</div></section>
+          <section class="panel"><div class="panel-head"><div><div class="panel-title">団体のデザイン</div><div class="panel-note">背景色・文字色・フォントをカスタマイズ</div></div></div><div class="panel-body"><div class="theme-preview" id="themePreview"><strong>青葉高校 吹奏楽部</strong><span>この団体のテーマプレビュー</span></div><div class="theme-controls"><label class="color-field">背景色 <input type="color" id="themePage" value="${escapeHtml(data.theme.page)}"></label><label class="color-field">文字色 <input type="color" id="themeInk" value="${escapeHtml(data.theme.ink)}"></label></div><div class="field" style="margin-top:12px"><label for="themeFont">フォント</label><select id="themeFont"><option ${data.theme.font==='DM Sans'?'selected':''}>DM Sans</option><option ${data.theme.font==='Noto Sans JP'?'selected':''}>Noto Sans JP</option></select></div><div style="display:flex;justify-content:flex-end;margin-top:12px"><button class="primary-button" data-action="save-theme">テーマを保存</button></div></div></section>
+        </div><div class="stack">
+          <section class="panel"><div class="panel-head"><div><div class="panel-title">練習予定を作成</div><div class="panel-note">カレンダーとホームに表示</div></div></div><div class="panel-body"><form id="eventForm" class="field-grid"><div class="field"><label for="eventDate">日付</label><input id="eventDate" type="date" required value="${shiftDay(1)}"></div><div class="field"><label for="eventTime">開始時刻</label><input id="eventTime" type="time" required value="16:00"></div><div class="field full"><label for="eventTitle">練習内容</label><input id="eventTitle" required placeholder="例：合奏練習"></div><div class="field full"><label for="eventPlace">場所</label><input id="eventPlace" required placeholder="例：音楽室"></div><div class="field full"><label for="eventDetail">詳細</label><input id="eventDetail" placeholder="練習内容など"></div><div class="field full"><button class="primary-button" type="submit">予定を追加</button></div></form></div></section>
+          <section class="panel"><div class="panel-head"><div><div class="panel-title">全体連絡を投稿</div><div class="panel-note">ホーム画面に掲載されます</div></div></div><div class="panel-body"><form id="noticeForm" class="field-grid"><div class="field full"><label for="noticeTitle">タイトル</label><input id="noticeTitle" required placeholder="連絡のタイトル"></div><div class="field full"><label for="noticeBody">内容</label><textarea id="noticeBody" required placeholder="部員への連絡事項"></textarea></div><div class="field full"><button class="primary-button" type="submit">連絡を投稿</button></div></form></div></section>
+        </div></div>`;
+      const previewTitle = content.querySelector('#themePreview strong');
+      if (previewTitle) previewTitle.textContent = `${data.schoolName} ${data.clubName}`;
+    }
+    function showToast(message) {
+      const toast = document.getElementById('toast'); toast.textContent = message; toast.classList.add('show');
+      clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.classList.remove('show'), 2600);
+    }
+    function openModal(title, body) {
+      modal.innerHTML = `<div class="modal-head"><div class="modal-title" id="modalTitle">${title}</div><button class="icon-button" data-action="close-modal" aria-label="閉じる">×</button></div><div class="modal-body">${body}</div>`;
+      modalBackdrop.classList.add('open');
+    }
+    function closeModal() { modalBackdrop.classList.remove('open'); }
+    function formMarkup(type) {
+      if (type === 'absence') return `<form id="absenceForm"><div class="field"><label>連絡内容</label><div class="reason-options"><button type="button" class="reason-option kind-option ${absenceKind==='欠席'?'selected':''}" data-kind="欠席">欠席</button><button type="button" class="reason-option kind-option ${absenceKind==='遅刻'?'selected':''}" data-kind="遅刻">遅刻</button></div></div><div class="field" style="margin-top:15px"><label>理由</label><div class="reason-options" id="reasonOptions">${['他部活への参加','家の用事','習い事','体調不良','公欠','その他'].map(reason => `<button type="button" class="reason-option ${reason===selectedReason?'selected':''}" data-reason="${reason}">${reason}</button>`).join('')}</div></div><div class="field" style="margin-top:17px"><label>対象日</label><input name="date" type="date" required value="${dayKey(new Date())}"></div><div class="field" id="arrivalField" style="margin-top:17px" ${absenceKind==='遅刻'?'':'hidden'}><label>到着予定時刻</label><div class="clock-controls"><div class="clock-dial" id="clockDial"><div class="clock-hand" id="clockHand"></div><div class="clock-center"></div></div><div class="ampm"><button type="button" class="${clockPeriod==='午前'?'selected':''}" data-period="午前">午前</button><button type="button" class="${clockPeriod==='午後'?'selected':''}" data-period="午後">午後</button></div></div><div class="clock-hint" id="clockHint">${clockPeriod} ${clockHour}:00 頃に到着予定</div></div><div class="field" style="margin-top:16px"><label for="absenceNote">補足</label><textarea id="absenceNote" placeholder="必要な連絡があれば入力してください"></textarea></div><div class="modal-footer"><button type="button" class="secondary-button" data-action="close-modal">キャンセル</button><button type="submit" class="primary-button">連絡を送信</button></div></form>`;
+      if (type === 'purchase') return `<form id="purchaseForm" class="field-grid"><div class="field full"><label for="purchaseTitle">希望する物品・修理</label><input id="purchaseTitle" required placeholder="例：譜面台の修理"></div><div class="field"><label for="purchaseCategory">種類</label><select id="purchaseCategory"><option>購入希望</option><option>修理希望</option></select></div><div class="field"><label for="purchaseUrgency">希望時期</label><select id="purchaseUrgency"><option>急ぎではない</option><option>なるべく早く</option><option>今週中</option></select></div><div class="field full"><label for="purchaseBody">詳細</label><textarea id="purchaseBody" placeholder="数量、状態、必要な理由など"></textarea></div><div class="field full"><div class="modal-footer"><button type="button" class="secondary-button" data-action="close-modal">キャンセル</button><button type="submit" class="primary-button">希望を送信</button></div></div></form>`;
+      return `<form id="lostForm" class="field-grid"><div class="field full"><label for="lostTitle">落とし物・拾得物</label><input id="lostTitle" required placeholder="例：黒い譜面ファイル"></div><div class="field full"><label for="lostPlace">場所・状況</label><textarea id="lostPlace" placeholder="見つけた場所、特徴など"></textarea></div><div class="field full"><label for="lostPhoto">写真を添付</label><input id="lostPhoto" type="file" accept="image/*"><img id="lostPreview" alt="写真プレビュー" style="display:none;max-width:100%;max-height:180px;object-fit:contain;border-radius:8px"></div><div class="field full"><div class="modal-footer"><button type="button" class="secondary-button" data-action="close-modal">キャンセル</button><button type="submit" class="primary-button">報告を送信</button></div></div></form>`;
+    }
+    function openAbsence() {
+      selectedReason = '体調不良';
+      absenceKind = '欠席';
+      openModal('遅刻・欠席連絡', formMarkup('absence'));
+      const dial = document.getElementById('clockDial');
+      for (let hour=1; hour<=12; hour++) {
+        const angle = (hour*30-90)*Math.PI/180, radius=72;
+        const button = document.createElement('button'); button.type='button'; button.className=`clock-number ${hour===clockHour?'selected':''}`; button.textContent=hour;
+        button.style.left=`${95+Math.cos(angle)*radius}px`; button.style.top=`${95+Math.sin(angle)*radius}px`;
+        button.addEventListener('click', () => { clockHour=hour; dial.querySelectorAll('.clock-number').forEach(item=>item.classList.toggle('selected', Number(item.textContent)===hour)); document.getElementById('clockHand').style.transform=`rotate(${hour*30}deg)`; document.getElementById('clockHint').textContent=`${clockPeriod} ${hour}:00 頃に到着予定`; });
+        dial.appendChild(button);
+      }
+      document.getElementById('clockHand').style.transform=`rotate(${clockHour*30}deg)`;
+      document.getElementById('arrivalField').hidden = absenceKind !== '遅刻';
+    }
+    function openSongModal(song = null) {
+      const editing = Boolean(song);
+      openModal(editing?'曲を編集':'ライブラリに曲を追加', `<form id="songForm" class="field-grid"><div class="field full"><label for="songTitle">曲名</label><input id="songTitle" required value="${escapeHtml(song?.title||'')}" placeholder="例：宝島"></div><div class="field full"><label for="songByline">作曲・編曲者</label><input id="songByline" required value="${escapeHtml(song?.byline||'')}" placeholder="作曲者 / 編曲者"></div><div class="field full"><label for="songSort">並び替え用の読み（ローマ字）</label><input id="songSort" value="${escapeHtml(song?.sortKey||'')}" placeholder="例：Takarajima"></div><div class="field full"><label for="songDrive">Google Driveの楽譜URL</label><input id="songDrive" type="url" value="${escapeHtml(song?.drive||'')}" placeholder="https://drive.google.com/..."></div><div class="field full"><label for="songYoutube">YouTube参考音源URL</label><input id="songYoutube" type="url" value="${escapeHtml(song?.youtube||'')}" placeholder="https://www.youtube.com/..."></div><div class="field full"><label for="songAudio">音源ファイル ${song?.audioKey?'（新しいファイルを選ぶと差し替え）':''}</label><input id="songAudio" type="file" accept="audio/*,.mp3,.m4a,.wav,.ogg"></div><div class="field full"><div class="modal-footer"><button type="button" class="secondary-button" data-action="close-modal">キャンセル</button><button type="submit" class="primary-button">保存</button></div></div></form>`);
+    }
+    function openRequestForm(type) {
+      const titles = { absence: '遅刻・欠席連絡', purchase: '購入・修理希望', lost: '落とし物を報告' };
+      if (type === 'absence') openAbsence(); else openModal(titles[type], formMarkup(type));
+    }
+    function handleClick(event) {
+      const target = event.target.closest('button, a, .calendar-day');
+      if (!target) return;
+      if (target.dataset.authAction === 'toggle-mode') { authMode=authMode==='signin'?'signup':'signin'; authMessage=''; renderAuthGate(); return; }
+      if (target.dataset.authAction === 'sign-out' || target.id === 'signOutButton') {
+        supabaseClient.auth.signOut().then(({ error }) => { if(error) showToast('ログアウトに失敗しました'); });
+        return;
+      }
+      if (target.dataset.page) { activePage=target.dataset.page; render(); closeDrawer(); return; }
+      if (target.dataset.form) { openRequestForm(target.dataset.form); closeDrawer(); return; }
+      if (target.dataset.action === 'close-modal') { closeModal(); return; }
+      if (target.dataset.kind) { absenceKind=target.dataset.kind; document.querySelectorAll('.kind-option').forEach(item=>item.classList.toggle('selected',item.dataset.kind===absenceKind)); document.getElementById('arrivalField').hidden=absenceKind!=='遅刻'; return; }
+      if (target.dataset.reason) { selectedReason=target.dataset.reason; document.querySelectorAll('#reasonOptions .reason-option').forEach(item=>item.classList.toggle('selected',item.dataset.reason===selectedReason)); const arrival = document.getElementById('arrivalField'); if(arrival) arrival.hidden=absenceKind!=='遅刻'; return; }
+      if (target.dataset.period) { clockPeriod=target.dataset.period; document.querySelectorAll('[data-period]').forEach(item=>item.classList.toggle('selected',item.dataset.period===clockPeriod)); document.getElementById('clockHint').textContent=`${clockPeriod} ${clockHour}:00 頃に到着予定`; return; }
+      if (target.dataset.month) { if(target.dataset.month==='today') calendarDate=new Date(); else calendarDate.setMonth(calendarDate.getMonth()+Number(target.dataset.month)); renderCalendar(); return; }
+      if (target.classList.contains('calendar-day')) { selectedDate=target.dataset.date; renderCalendar(); return; }
+      if (target.dataset.action==='request-status') { updateReportStatus(target.dataset.id, target.dataset.status).catch(showDatabaseError); return; }
+      if (target.dataset.action==='member-role') { updateMemberRole(target.dataset.index).catch(showDatabaseError); return; }
+      if (target.dataset.action==='save-theme') { saveTheme().catch(showDatabaseError); return; }
+      if (target.dataset.action==='add-song') { openSongModal(); return; }
+      if (target.dataset.action==='edit-song') { const song=data.songs.find(item=>item.id===target.dataset.id); if(song) openSongModal(song); return; }
+      if (target.dataset.action==='play-song') { playSong(target.dataset.id); return; }
+      if (target.id==='menuButton') { openDrawer(); return; }
+      if (target.id==='noticeButton') { openRequestForm('absence'); return; }
+      if (target.id==='clubSwitch') { showToast(`${data.schoolName} · ${data.clubName}`); return; }
+    }
+    function openDrawer() { document.getElementById('sidebar').classList.add('open'); document.getElementById('scrim').classList.add('open'); }
+    function closeDrawer() { document.getElementById('sidebar').classList.remove('open'); document.getElementById('scrim').classList.remove('open'); }
+    function showDatabaseError(error) {
+      console.error('Supabase operation failed', error);
+      showToast(error?.message || 'Supabaseへの保存に失敗しました');
+    }
+    async function updateReportStatus(id, uiStatus) {
+      const status = uiStatus === '却下' ? 'rejected' : 'resolved';
+      checkedData(await supabaseClient.from('reports').update({ status }).eq('id', id).eq('school_id', data.schoolId));
+      await loadWorkspace(currentSession.user);
+      showToast(`投稿を「${reportStatusLabel(status)}」にしました`);
+    }
+    async function updateMemberRole(index) {
+      const member = data.members[Number(index)];
+      if (!member) return;
+      checkedData(await supabaseClient.from('profiles').update({ is_admin: !member.role }).eq('id', member.id).eq('school_id', data.schoolId));
+      await loadWorkspace(currentSession.user);
+      showToast(`${member.name}の権限を更新しました`);
+    }
+    async function saveTheme() {
+      const theme = { page: document.getElementById('themePage').value, ink: document.getElementById('themeInk').value, font: document.getElementById('themeFont').value };
+      checkedData(await supabaseClient.from('club_settings').upsert({ school_id: data.schoolId, theme_page: theme.page, theme_ink: theme.ink, theme_font: theme.font }, { onConflict: 'school_id' }));
+      data.theme = theme;
+      render();
+      showToast('団体のデザインを保存しました');
+    }
+    async function requestEntry(kind, title, reason, date=dayKey(new Date()), arrivalAt=null, photoFile=null) {
+      let photoPath = null;
+      if (photoFile) {
+        const safeName = photoFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        photoPath = `${data.schoolId}/${crypto.randomUUID()}-${safeName}`;
+        const upload = await supabaseClient.storage.from('report-photos').upload(photoPath, photoFile, { contentType: photoFile.type, upsert: false });
+        if (upload.error) throw upload.error;
+      }
+      checkedData(await supabaseClient.from('reports').insert({ school_id: data.schoolId, kind, report_date: date, title, reason, arrival_at: arrivalAt, photo_url: photoPath }));
+      closeModal();
+      await loadWorkspace(currentSession.user);
+      showToast('連絡を送信しました');
+    }
+    async function playSong(id) {
+      const song=data.songs.find(item=>item.id===id); if(!song?.audioKey) return;
+      const { data: signed, error } = await supabaseClient.storage.from('song-audio').createSignedUrl(song.audioKey, 3600);
+      if (error) { showDatabaseError(error); return; }
+      let player=document.getElementById('audioPlayer'); if(!player){player=document.createElement('audio');player.id='audioPlayer';player.controls=true;player.style='position:fixed;left:50%;bottom:18px;z-index:40;width:min(420px,calc(100vw - 30px));transform:translateX(-50%)';document.body.appendChild(player);} player.src=signed.signedUrl; player.play(); showToast(`再生中：${song.title}`);
+    }
+    document.addEventListener('click', handleClick);
+    document.getElementById('scrim').addEventListener('click', closeDrawer);
+    modalBackdrop.addEventListener('click', event => { if(event.target===modalBackdrop) closeModal(); });
+    document.addEventListener('keydown', event => { if(event.key==='Escape'){closeModal();closeDrawer();} });
+    document.addEventListener('change', event => {
+      if(event.target.id==='lostPhoto' && event.target.files[0]) { const reader=new FileReader();reader.onload=()=>{const preview=document.getElementById('lostPreview');preview.src=reader.result;preview.style.display='block';};reader.readAsDataURL(event.target.files[0]); }
+    });
+    document.addEventListener('submit', async event => {
+      event.preventDefault(); const form=event.target;
+      if (form.id === 'authForm') {
+        const values = new FormData(form);
+        const email = String(values.get('email') || '').trim();
+        const password = String(values.get('password') || '');
+        const authError = document.getElementById('authError');
+        if (authError) authError.textContent = '';
+        try {
+          if (authMode === 'signup') {
+            const fullName = String(values.get('fullName') || '').trim();
+            const partPrimary = String(values.get('partPrimary') || '').trim();
+            const partSecondary = String(values.get('partSecondary') || '').trim();
+            const part = [partPrimary, partSecondary].filter(Boolean).join(' / ');
+            const { data: signUpData, error } = await supabaseClient.auth.signUp({ email, password, options: { data: { full_name: fullName, part, part_primary: partPrimary, part_secondary: partSecondary } } });
+            if (error) throw error;
+            if (signUpData.session) await applySession(signUpData.session);
+            else {
+              authMode = 'signin';
+              authMessage = 'アカウントを作成しました。ログイン後、部活管理者に名簿への追加を依頼してください。';
+              renderAuthGate();
+            }
+          } else {
+            const { data: signInData, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+            if (error) throw error;
+            await applySession(signInData.session);
+          }
+        } catch (error) {
+          if (authError) authError.textContent = error.message || '認証に失敗しました。入力内容をご確認ください。';
+        }
+        return;
+      }
+      try {
+        if(form.id==='absenceForm') {
+          const date=new FormData(form).get('date');
+          const note=document.getElementById('absenceNote').value.trim();
+          const arrivalHour=clockHour%12+(clockPeriod==='午後'?12:0);
+          const arrivalAt=absenceKind==='遅刻'?`${String(arrivalHour).padStart(2,'0')}:00:00`:null;
+          const title=absenceKind==='遅刻'?'練習に遅刻します':'練習を欠席します';
+          const reason=`${selectedReason}${note?` · ${note}`:''}`;
+          await requestEntry('absence',title,reason,date,arrivalAt);
+          return;
+        }
+        if(form.id==='purchaseForm') {
+          const title=document.getElementById('purchaseTitle').value.trim();
+          const reason=`${document.getElementById('purchaseCategory').value} · ${document.getElementById('purchaseUrgency').value} · ${document.getElementById('purchaseBody').value.trim()}`;
+          await requestEntry('purchase_repair',title,reason);
+          return;
+        }
+        if(form.id==='lostForm') {
+          const title=document.getElementById('lostTitle').value.trim();
+          const reason=document.getElementById('lostPlace').value.trim();
+          await requestEntry('lost_found',title,reason,dayKey(new Date()),null,document.getElementById('lostPhoto').files[0]||null);
+          return;
+        }
+        if(form.id==='songForm') {
+          const file=document.getElementById('songAudio').files[0];
+          const existingId=form.dataset.id;
+          const songRow={title:document.getElementById('songTitle').value.trim(),sort_reading:document.getElementById('songSort').value.trim()||document.getElementById('songTitle').value.trim(),composer:document.getElementById('songByline').value.trim(),arranger:null,drive_url:document.getElementById('songDrive').value.trim()||null,youtube_url:document.getElementById('songYoutube').value.trim()||null};
+          let songId=existingId;
+          if(existingId) checkedData(await supabaseClient.from('songs').update(songRow).eq('id',existingId).eq('school_id',data.schoolId));
+          else songId=checkedData(await supabaseClient.from('songs').insert({...songRow,school_id:data.schoolId}).select('id').single()).id;
+          if(file) {
+            const path=`${data.schoolId}/${songId}.audio`;
+            const upload=await supabaseClient.storage.from('song-audio').upload(path,file,{contentType:file.type,upsert:true});
+            if(upload.error) throw upload.error;
+            checkedData(await supabaseClient.from('songs').update({audio_file_path:path}).eq('id',songId).eq('school_id',data.schoolId));
+          }
+          closeModal(); await loadWorkspace(currentSession.user); showToast('ライブラリを更新しました'); return;
+        }
+        if(form.id==='eventForm') {
+          const startsAt=new Date(`${document.getElementById('eventDate').value}T${document.getElementById('eventTime').value}:00+09:00`).toISOString();
+          checkedData(await supabaseClient.from('schedules').insert({school_id:data.schoolId,title:document.getElementById('eventTitle').value.trim(),content:document.getElementById('eventDetail').value.trim(),starts_at:startsAt,location:document.getElementById('eventPlace').value.trim()}));
+          await loadWorkspace(currentSession.user); showToast('練習予定を追加しました'); return;
+        }
+        if(form.id==='noticeForm') {
+          checkedData(await supabaseClient.from('announcements').insert({school_id:data.schoolId,author_id:currentProfile.id,title:document.getElementById('noticeTitle').value.trim(),body:document.getElementById('noticeBody').value.trim()}));
+          await loadWorkspace(currentSession.user); showToast('全体連絡を投稿しました');
+        }
+      } catch (error) { showDatabaseError(error); }
+    });
+    document.addEventListener('click', event => { if(event.target.id==='scrim') closeDrawer(); });
+    const originalOpenSongModal = openSongModal;
+    openSongModal = function(song = null) { originalOpenSongModal(song); const form=document.getElementById('songForm'); if(song){form.dataset.id=song.id;form.dataset.audioKey=song.audioKey||'';} };
+    supabaseClient.auth.onAuthStateChange((_event, session) => {
+      window.setTimeout(() => applySession(session), 0);
+    });
+    supabaseClient.auth.getSession().then(({ data: sessionData, error }) => {
+      if (error) { authMessage = 'Supabase Authに接続できませんでした。'; render(); return; }
+      applySession(sessionData.session);
+    });
+    render();
+  </script>
+</body>
+</html>
