@@ -4,7 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f3f5ef">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <title>Tutti | 部活の毎日を、ひとつに。</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -305,7 +311,7 @@
     <main class="main">
       <header class="topbar">
         <div class="top-left"><button class="icon-button mobile-menu" id="menuButton" aria-label="メニューを開く">☰</button><div class="crumb"><span id="crumbSchool">Tutti</span> / <strong id="crumbTitle">ホーム</strong></div></div>
-        <div class="top-actions"><span class="today-label" id="topDate"></span><button class="icon-button" id="noticeButton" title="連絡フォームを開く" aria-label="連絡フォーム">＋</button><div class="user-avatar" id="topUserAvatar" style="width:31px;height:31px;font-size:11px">♪</div></div>
+        <div class="top-actions"><span class="today-label" id="topDate"></span><button class="icon-button" id="installAppButton" title="アプリをインストール" aria-label="アプリをインストール" hidden>↓</button><button class="icon-button" id="noticeButton" title="連絡フォームを開く" aria-label="連絡フォーム">＋</button><div class="user-avatar" id="topUserAvatar" style="width:31px;height:31px;font-size:11px">♪</div></div>
       </header>
       <section class="content" id="content"></section>
     </main>
@@ -378,6 +384,7 @@
     let clockHour = 4;
     let clockPeriod = '午後';
     let toastTimer;
+    let deferredInstallPrompt = null;
     const content = document.getElementById('content');
     const modalBackdrop = document.getElementById('modalBackdrop');
     const modal = document.getElementById('modal');
@@ -992,6 +999,26 @@
     document.addEventListener('click', event => { if(event.target.id==='scrim') closeDrawer(); });
     const originalOpenSongModal = openSongModal;
     openSongModal = function(song = null) { originalOpenSongModal(song); const form=document.getElementById('songForm'); if(song){form.dataset.id=song.id;form.dataset.audioKey=song.audioKey||'';} };
+    const installAppButton = document.getElementById('installAppButton');
+    window.addEventListener('beforeinstallprompt', event => {
+      event.preventDefault();
+      deferredInstallPrompt = event;
+      installAppButton.hidden = false;
+    });
+    installAppButton.addEventListener('click', async () => {
+      if (!deferredInstallPrompt) return;
+      deferredInstallPrompt.prompt();
+      await deferredInstallPrompt.userChoice;
+      deferredInstallPrompt = null;
+      installAppButton.hidden = true;
+    });
+    window.addEventListener('appinstalled', () => {
+      deferredInstallPrompt = null;
+      installAppButton.hidden = true;
+    });
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('/service-worker.js').catch(error => console.error('Service Worker registration failed', error)));
+    }
     supabaseClient.auth.onAuthStateChange((_event, session) => {
       window.setTimeout(() => applySession(session), 0);
     });

@@ -10,6 +10,15 @@ Vercelには静的サイトとして `index.html` をデプロイします。Sup
 1. SupabaseのSQL Editorで `supabase/schema.sql` を実行する
 2. Vercelでこのリポジトリを静的サイトとしてデプロイする
 
+## スマートフォンで使う
+
+HTTPSで公開したTuttiをスマートフォンのブラウザーで開いてインストールします。
+
+- Android/Chrome: 画面上部のインストールボタン、またはブラウザーのメニューから「アプリをインストール」
+- iPhone/Safari: 共有メニューから「ホーム画面に追加」
+
+アプリの画面外枠はキャッシュされますが、認証・団体データ・画像/音源には通信が必要です。オフラインではログインやデータ更新はできません。
+
 `schema.sql` は認証ユーザー作成時に学校・部活とプロフィールを安全に作成する
 データベーストリガーも設定します。既存のSupabaseプロジェクトにもこのSQLを再実行して
 招待コード列とトリガーを追加してください。サービスロールキーをHTMLに設定しないでください。
@@ -30,7 +39,6 @@ supabase functions deploy join-group
 ```
 
 Supabase DashboardのEdge Function Secretsに次の値を登録してください。
-supabase functions deploy join-group
 
 `manage-member` Functionは同じ団体の管理者だけに所属ごとの部員情報編集と除籍を許可します。
 他団体の所属が残る場合はAuthアカウントを維持し、最後の管理者や自分自身の除籍は拒否します。
