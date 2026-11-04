@@ -3,9 +3,9 @@ const SHELL_URLS = [
   "/",
   "/index.html",
   "/manifest.webmanifest",
-  "/icons/icon-192.png",
-  "/icons/icon-512.png",
-  "/icons/apple-touch-icon.png",
+  "/icons/192.png",
+  "/icons/512.png",
+  "/icons/Square44x44Logo.targetsize-256.png",
 ];
 
 self.addEventListener("install", (event) => {
