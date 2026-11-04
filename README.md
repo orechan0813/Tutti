@@ -10,5 +10,34 @@ Vercelには静的サイトとして `index.html` をデプロイします。Sup
 1. SupabaseのSQL Editorで `supabase/schema.sql` を実行する
 2. Vercelでこのリポジトリを静的サイトとしてデプロイする
 
+`schema.sql` は認証ユーザー作成時に学校・部活とプロフィールを安全に作成する
+データベーストリガーも設定します。既存のSupabaseプロジェクトにもこのSQLを再実行して
+招待コード列とトリガーを追加してください。サービスロールキーをHTMLに設定しないでください。
+
+組織の登録者へ招待コードと基本情報をメール送信するには、Supabase Edge Functionと
+Resendの送信元ドメイン設定が必要です。チャットやソースコードへ共有したResend APIキーは
+失効させ、新しいキーを発行してください。キーはHTMLやGitに置かず、Supabase Dashboardの
+「Edge Functions」→「Secrets」へ直接登録します。
+
+1. Supabase SQL Editorで最新の `supabase/schema.sql` を実行する
+2. Resendで送信元ドメインを検証する
+3. Supabase CLIを対象プロジェクトにリンクし、Functionをデプロイする
+
+```sh
+supabase functions deploy send-organization-welcome
+```
+
+Supabase DashboardのEdge Function Secretsに次の値を登録してください。
+
+- `RESEND_API_KEY`: Resendで再発行したAPIキー
+- `TUTTI_FROM_EMAIL`: Resendで検証済みの送信元（例: `Tutti <noreply@example.com>`）
+- `TUTTI_APP_URL`: VercelにデプロイしたTuttiのURL
+
+Functionは認証ユーザーが学校作成者かつ管理者であることを確認し、登録メールアドレスへ
+団体名・招待コード・アプリURLを送信します。送信済み時刻を記録して重複送信を防ぎます。
+
+部員はホーム画面に表示される招待コードを使って参加できます。このコードは同じ団体の
+ログイン済みユーザー全員に表示されます。コードを知っている人が参加できる仕様です。
+
 401が続く場合は、Vercelのデプロイ詳細に表示されるエラーを確認してください。
 VercelアカウントやGit連携の認証エラーは、SQLファイルの配置とは別に設定の確認が必要です。

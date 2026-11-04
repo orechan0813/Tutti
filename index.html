@@ -27,25 +27,25 @@
     button, input, select, textarea { font: inherit; }
     button { color: inherit; }
     .app { min-height: 100vh; }
-    .sidebar { width: 252px; position: fixed; inset: 0 auto 0 0; padding: 27px 18px 20px; background: #fff; border-right: 1px solid var(--line); display: flex; flex-direction: column; z-index: 20; transition: transform .24s ease; }
+    .sidebar { width: 252px; position: fixed; inset: 0 auto 0 0; padding: 27px 18px 20px; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; background: #fff; border-right: 1px solid var(--line); display: flex; flex-direction: column; z-index: 20; transition: transform .24s ease; }
     .brand { display: flex; align-items: center; gap: 11px; padding: 0 11px 26px; }
     .brand-mark { width: 36px; height: 36px; display: grid; place-items: center; background: var(--green); color: #fff; border-radius: 12px; font-size: 19px; font-weight: 800; }
     .brand-name { font-family: "DM Sans", sans-serif; font-size: 23px; line-height: 1; font-weight: 700; letter-spacing: 0; }
     .brand-caption { color: var(--muted); font-size: 10px; margin-top: 4px; }
-    .club-switch { display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px; border: 1px solid var(--line); border-radius: 9px; background: #fbfcfa; text-align: left; cursor: pointer; margin-bottom: 25px; }
+    .club-switch { display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px; border: 1px solid var(--line); border-radius: 9px; background: #fbfcfa; text-align: left; cursor: pointer; margin-bottom: 25px; flex-shrink: 0; }
     .club-avatar { flex: 0 0 34px; height: 34px; border-radius: 9px; background: #f9e3da; color: #b75542; display: grid; place-items: center; font-weight: 700; }
     .club-name { font-weight: 700; font-size: 12px; }
     .club-school { color: var(--muted); font-size: 11px; }
     .club-arrow { margin-left: auto; color: var(--muted); }
     .nav-label { padding: 0 12px 8px; color: #9aa39d; font-size: 10px; font-weight: 700; letter-spacing: .08em; }
-    .nav-list { display: grid; gap: 4px; }
+    .nav-list { display: grid; gap: 4px; flex: 0 0 auto; }
     .nav-item { width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 12px; text-decoration: none; border: 0; border-radius: 8px; background: transparent; color: #65726b; text-align: left; cursor: pointer; font-size: 13px; }
     .nav-item:hover { background: #f6f8f5; color: var(--ink); }
     .nav-item.active { background: var(--green-pale); color: var(--green); font-weight: 700; }
     .nav-icon { width: 18px; text-align: center; font-size: 16px; }
     .nav-divider { height: 1px; background: var(--line); margin: 17px 7px; }
     .nav-badge { margin-left: auto; min-width: 20px; padding: 1px 6px; background: #fbe9e4; color: #b65743; border-radius: 99px; text-align: center; font-size: 10px; font-weight: 700; }
-    .sidebar-bottom { margin-top: auto; }
+    .sidebar-bottom { margin-top: auto; flex-shrink: 0; }
     .storage-note { display: flex; gap: 9px; align-items: flex-start; margin: 0 5px 16px; padding: 11px; background: #f7f8f5; border-radius: 8px; color: var(--muted); font-size: 10px; }
     .user-row { display: flex; align-items: center; gap: 10px; padding: 12px 8px 0; border-top: 1px solid var(--line); }
     .user-avatar { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; background: #f5d6c9; color: #784b3d; font-weight: 700; }
@@ -203,9 +203,9 @@
     .clock-hint { color: var(--muted); text-align: center; font-size: 10px; }
     .toast { position: fixed; right: 24px; bottom: 24px; z-index: 80; max-width: min(370px, calc(100vw - 32px)); padding: 12px 16px; background: #1d3831; color: white; border-radius: 8px; box-shadow: var(--shadow); font-size: 12px; opacity: 0; transform: translateY(8px); pointer-events: none; transition: .2s ease; }
     .toast.show { opacity: 1; transform: translateY(0); }
-    .auth-gate { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 20px; background: var(--page); }
+    .auth-gate { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom)); overflow-y: auto; overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; background: var(--page); }
     .auth-gate[hidden] { display: none; }
-    .auth-panel { width: min(410px, 100%); padding: 30px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); }
+    .auth-panel { width: min(410px, 100%); margin-block: auto; flex: 0 0 auto; padding: 30px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); }
     .auth-panel h1 { margin-top: 20px; font-size: 22px; }
     .auth-message { margin: 8px 0 20px; color: var(--muted); font-size: 12px; }
     .auth-error { margin-top: 13px; color: #b65743; font-size: 11px; }
@@ -223,7 +223,7 @@
       .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
     @media (max-width: 760px) {
-      .sidebar { width: 275px; transform: translateX(-100%); box-shadow: none; }
+      .sidebar { width: min(300px, 86vw); transform: translateX(-100%); box-shadow: none; }
       .sidebar.open { transform: translateX(0); box-shadow: 20px 0 50px rgba(24,46,36,.12); }
       .drawer-scrim.open { display: block; position: fixed; inset: 0; z-index: 19; background: rgba(21,37,31,.32); }
       .main { margin-left: 0; }
@@ -232,9 +232,15 @@
       .top-left { display: flex; align-items: center; }
       .today-label { display: none; }
       .content { padding: 23px 15px 38px; }
-      .welcome-row { align-items: flex-start; }
-      h1 { font-size: 22px; }
-      .welcome-row > .primary-button { padding: 0 10px; }
+      .welcome-row { align-items: flex-start; flex-direction: column; gap: 12px; }
+      h1 { font-size: clamp(20px, 5vw, 22px); }
+      .eyebrow { font-size: 12px; }
+      .subheading { font-size: 13px; }
+      .welcome-row > .primary-button { padding: 0 14px; font-size: 13px; }
+      .stat-top { font-size: 12px; }
+      .stat-foot, .panel-note { font-size: 11px; }
+      .field label { font-size: 12px; }
+      .field input, .field select, .field textarea { font-size: 16px; }
       .home-grid, .admin-grid { grid-template-columns: 1fr; }
       .calendar-day { min-height: 70px; padding: 6px 4px; }
       .calendar-event { padding: 2px; font-size: 8px; }
@@ -246,8 +252,8 @@
       .stats-grid { gap: 9px; }
       .stat-card { min-height: 100px; padding: 12px; }
       .stat-number { font-size: 21px; }
-      .welcome-row { gap: 7px; }
-      .welcome-row .primary-button { font-size: 10px; }
+      .welcome-row { gap: 10px; }
+      .auth-panel { padding: 24px 20px; }
       .page-toolbar { align-items: flex-start; flex-direction: column; }
       .search-box { width: 100%; }
       .field-grid { grid-template-columns: 1fr; }
@@ -304,6 +310,10 @@
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     const dayKey = date => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
     const japanDateKey = value => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(value));
+    const japanGreeting = () => {
+      const hour = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Tokyo', hour: 'numeric', hourCycle: 'h23' }).format(new Date()));
+      return hour < 11 ? 'おはよう' : hour < 18 ? 'こんにちは' : 'こんばんは';
+    };
     const shiftDay = offset => { const date = new Date(); date.setDate(date.getDate()+offset); return dayKey(date); };
     const seed = {
       isAdmin: true,
@@ -346,6 +356,7 @@
     let currentProfile = null;
     let realtimeChannel = null;
     let loadSequence = 0;
+    const welcomeEmailAttempts = new Set();
     let authMessage = '';
     let authMode = 'signin';
     let signupType = 'create';
@@ -465,6 +476,23 @@
       authMessage = '';
       subscribeToWorkspace(schoolId);
       render();
+      if (profile.is_admin && user.user_metadata?.registration_mode === 'create') {
+        sendOrganizationWelcome(user.id).catch(error => {
+          welcomeEmailAttempts.delete(user.id);
+          console.error('Organization welcome email failed', error);
+          showToast('団体は登録されましたが、案内メールを送信できませんでした。');
+        });
+      }
+    }
+    async function sendOrganizationWelcome(userId) {
+      if (welcomeEmailAttempts.has(userId)) return;
+      welcomeEmailAttempts.add(userId);
+      const { error } = await supabaseClient.functions.invoke('send-organization-welcome');
+      if (error) {
+        welcomeEmailAttempts.delete(userId);
+        console.error('Organization welcome email failed', error);
+        showToast('団体は登録されましたが、案内メールを送信できませんでした。');
+      }
     }
     function subscribeToWorkspace(schoolId) {
       if (realtimeChannel) supabaseClient.removeChannel(realtimeChannel);
@@ -490,7 +518,10 @@
       const registering = authMode === 'signup';
       const title = signedIn ? '部活プロフィールを確認' : registering ? '新規部員登録' : 'Tutti にログイン';
       const message = authMessage || (signedIn ? '所属団体のデータを読み込んでいます。' : registering ? signupType === 'create' ? '団体と管理者アカウントを作成します。' : '招待コードを使って既存の団体に参加します。' : 'メールアドレスとパスワードでログインしてください。');
-      const signupFields = registering ? `<fieldset class="field full" style="border:0;padding:0;margin:0"><legend class="field" style="margin-bottom:7px">登録方法</legend><div class="auth-mode-options"><label class="auth-mode-option"><input type="radio" name="registrationMode" value="create" ${signupType === 'create' ? 'checked' : ''} required><span>部活・団体を新しく登録する（管理者アカウント）</span></label><label class="auth-mode-option"><input type="radio" name="registrationMode" value="join" ${signupType === 'join' ? 'checked' : ''} required><span>既存の部活に参加する（一般部員アカウント）</span></label></div></fieldset>${signupType === 'create' ? '<div class="field full"><label for="authSchoolName">学校名</label><input id="authSchoolName" name="schoolName" autocomplete="organization" placeholder="例：青葉高校" required></div><div class="field full"><label for="authClubName">部活・団体名</label><input id="authClubName" name="clubName" placeholder="例：吹奏楽部" required></div>' : '<div class="field"><label for="authPartPrimary">メインパート</label><input id="authPartPrimary" name="partPrimary" autocomplete="off" placeholder="例：Alto Sax" required></div><div class="field"><label for="authPartSecondary">サブパート（任意）</label><input id="authPartSecondary" name="partSecondary" autocomplete="off" placeholder="例：Piano"></div><div class="field full"><label for="authInviteCode">招待コード</label><input id="authInviteCode" name="inviteCode" autocomplete="off" autocapitalize="characters" minlength="12" maxlength="12" pattern="[A-Fa-f0-9]{12}" placeholder="12桁のコード" required></div>'}<div class="field full"><label for="authFullName">氏名</label><input id="authFullName" name="fullName" autocomplete="name" required></div>` : '';
+      const registrationOptions = `<fieldset class="field full" style="border:0;padding:0;margin:0"><legend class="field" style="margin-bottom:7px">登録方法</legend><div class="auth-mode-options"><label class="auth-mode-option"><input type="radio" name="registrationMode" value="create" ${signupType === 'create' ? 'checked' : ''} required><span>部活・団体を新しく登録する（管理者アカウント）</span></label><label class="auth-mode-option"><input type="radio" name="registrationMode" value="join" ${signupType === 'join' ? 'checked' : ''} required><span>既存の部活に参加する（一般部員アカウント）</span></label></div></fieldset>`;
+      const organizationFields = '<div class="field full"><label for="authSchoolName">学校名</label><input id="authSchoolName" name="schoolName" autocomplete="organization" placeholder="例：青葉高校" required></div><div class="field full"><label for="authClubName">部活・団体名</label><input id="authClubName" name="clubName" placeholder="例：吹奏楽部" required></div>';
+      const memberFields = '<div class="field"><label for="authPartPrimary">メインパート</label><input id="authPartPrimary" name="partPrimary" autocomplete="off" placeholder="例：Alto Sax" required></div><div class="field"><label for="authPartSecondary">サブパート（任意）</label><input id="authPartSecondary" name="partSecondary" autocomplete="off" placeholder="例：Piano"></div><div class="field full"><label for="authInviteCode">招待コード</label><input id="authInviteCode" name="inviteCode" autocomplete="off" autocapitalize="characters" minlength="12" maxlength="12" pattern="[A-Fa-f0-9]{12}" placeholder="12桁のコード" required></div><div class="field full"><label for="authFullName">氏名</label><input id="authFullName" name="fullName" autocomplete="name" required></div>';
+      const signupFields = registering ? `${registrationOptions}${signupType === 'create' ? organizationFields : memberFields}` : '';
       const signedInActions = '<button class="secondary-button" data-auth-action="sign-out">ログアウト</button>';
       const authForm = `<form id="authForm" class="field-grid">${signupFields}<div class="field full"><label for="authEmail">メールアドレス</label><input id="authEmail" name="email" type="email" autocomplete="email" required></div><div class="field full"><label for="authPassword">パスワード</label><input id="authPassword" name="password" type="password" autocomplete="${registering ? 'new-password' : 'current-password'}" minlength="6" required></div><div class="field full"><button class="primary-button" type="submit">${registering ? '登録する' : 'ログイン'}</button></div></form><button class="secondary-button" style="width:100%;margin-top:9px" data-auth-action="toggle-mode">${registering ? 'ログイン画面に戻る' : '新規部員登録'}</button>`;
       document.getElementById('authGate').innerHTML = `<section class="auth-panel"><div class="brand" style="padding:0"><div class="brand-mark">T</div><div><div class="brand-name">tutti</div><div class="brand-caption">部活の毎日を、ひとつに。</div></div></div><h1>${title}</h1><p class="auth-message">${escapeHtml(message)}</p>${signedIn ? signedInActions : authForm}<div class="auth-error" id="authError"></div></section>`;
@@ -552,7 +583,7 @@
       const todayAbsences = data.absences.filter(item => item.date === todayKey);
       const available = data.meters.filter(item => item.status.includes('できます')).length;
       content.innerHTML = `
-        <div class="welcome-row"><div><div class="eyebrow">${escapeHtml(dateLabel(todayKey))}</div><h1>おはよう、${escapeHtml(data.userName)}さん</h1><div class="subheading">${escapeHtml(data.schoolName)} · ${escapeHtml(data.clubName)}</div></div><button class="primary-button" data-form="absence">＋　連絡する</button></div>
+        <div class="welcome-row"><div><div class="eyebrow">${escapeHtml(dateLabel(todayKey))}</div><h1>${japanGreeting()}、${escapeHtml(data.userName)}さん</h1><div class="subheading">${escapeHtml(data.schoolName)} · ${escapeHtml(data.clubName)}</div></div><button class="primary-button" data-form="absence">＋　連絡する</button></div>
         <div class="grid stats-grid">
           <div class="stat-card"><div class="stat-top">今日の部員 <span class="stat-symbol">♧</span></div><div class="stat-number">${Math.max(data.members.length-todayAbsences.length,0)}<span style="font-size:13px;font-weight:500"> / ${data.members.length}</span></div><div class="stat-foot">出席予定</div></div>
           <div class="stat-card"><div class="stat-top">今日の欠席・遅刻 <span class="stat-symbol" style="background:#fff0e9;color:#b56a4c">◷</span></div><div class="stat-number">${todayAbsences.length}<span style="font-size:13px;font-weight:500"> 名</span></div><div class="stat-foot">事前連絡を含む</div></div>
@@ -744,13 +775,15 @@
         if (authError) authError.textContent = '';
         try {
           if (authMode === 'signup') {
-            const fullName = String(values.get('fullName') || '').trim();
             const registrationMode = String(values.get('registrationMode') || '');
-            const metadata = { registration_mode: registrationMode, full_name: fullName };
+            const metadata = { registration_mode: registrationMode };
             if (registrationMode === 'create') {
               metadata.school_name = String(values.get('schoolName') || '').trim();
               metadata.club_name = String(values.get('clubName') || '').trim();
+              metadata.full_name = `${metadata.school_name} ${metadata.club_name} 管理者`;
             } else if (registrationMode === 'join') {
+              metadata.full_name = String(values.get('fullName') || '').trim();
+              if (!metadata.full_name) throw new Error('氏名を入力してください。');
               const partPrimary = String(values.get('partPrimary') || '').trim();
               const partSecondary = String(values.get('partSecondary') || '').trim();
               metadata.part = [partPrimary, partSecondary].filter(Boolean).join(' / ');

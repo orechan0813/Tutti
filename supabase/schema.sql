@@ -10,7 +10,9 @@ CREATE TABLE IF NOT EXISTS public.schools (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   school_name text NOT NULL,
   club_name text NOT NULL,
+  created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
   invite_code text NOT NULL DEFAULT upper(encode(gen_random_bytes(6), 'hex')),
+  welcome_email_sent_at timestamptz,
   google_account_email text,
   google_drive_folder_url text,
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -21,6 +23,8 @@ CREATE TABLE IF NOT EXISTS public.schools (
 );
 
 ALTER TABLE public.schools ADD COLUMN IF NOT EXISTS invite_code text;
+ALTER TABLE public.schools ADD COLUMN IF NOT EXISTS welcome_email_sent_at timestamptz;
+ALTER TABLE public.schools ADD COLUMN IF NOT EXISTS created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL;
 UPDATE public.schools
 SET invite_code = upper(encode(gen_random_bytes(6), 'hex'))
 WHERE invite_code IS NULL OR length(trim(invite_code)) = 0;
@@ -159,8 +163,8 @@ BEGIN
       RAISE EXCEPTION '学校名と部活・団体名を入力してください。';
     END IF;
 
-    INSERT INTO public.schools (school_name, club_name)
-    VALUES (school_name_value, club_name_value)
+    INSERT INTO public.schools (school_name, club_name, created_by)
+    VALUES (school_name_value, club_name_value, NEW.id)
     RETURNING id INTO school_id_value;
     admin_value := true;
   ELSIF registration_mode = 'join' THEN
