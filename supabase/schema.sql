@@ -44,11 +44,41 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   school_id uuid NOT NULL REFERENCES public.schools(id) ON DELETE RESTRICT,
   full_name text NOT NULL,
   part text,
+  grade smallint,
+  grade_as_of date,
   is_admin boolean NOT NULL DEFAULT false,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT profiles_name_not_blank CHECK (length(trim(full_name)) > 0)
 );
+
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS grade smallint;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS grade_as_of date;
+ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_grade_range_check;
+ALTER TABLE public.profiles ADD CONSTRAINT profiles_grade_range_check
+  CHECK (grade IS NULL OR grade BETWEEN 1 AND 3);
+UPDATE public.profiles
+SET grade_as_of = (pg_catalog.timezone('Asia/Tokyo', pg_catalog.now()))::date
+WHERE grade IS NOT NULL AND grade_as_of IS NULL;
+
+CREATE TABLE IF NOT EXISTS public.school_memberships (
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  school_id uuid NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
+  full_name text NOT NULL,
+  part text,
+  grade smallint CHECK (grade IS NULL OR grade BETWEEN 1 AND 3),
+  grade_as_of date,
+  is_admin boolean NOT NULL DEFAULT false,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, school_id),
+  CONSTRAINT school_memberships_name_not_blank CHECK (length(trim(full_name)) > 0)
+);
+
+INSERT INTO public.school_memberships (user_id, school_id, full_name, part, grade, grade_as_of, is_admin)
+SELECT id, school_id, full_name, part, grade, grade_as_of, is_admin
+FROM public.profiles
+ON CONFLICT (user_id, school_id) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS public.schedules (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -58,7 +88,7 @@ CREATE TABLE IF NOT EXISTS public.schedules (
   starts_at timestamptz NOT NULL,
   ends_at timestamptz,
   location text NOT NULL,
-  created_by uuid NOT NULL DEFAULT auth.uid() REFERENCES public.profiles(id) ON DELETE RESTRICT,
+  created_by uuid DEFAULT auth.uid() REFERENCES public.profiles(id) ON DELETE SET NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT schedules_title_not_blank CHECK (length(trim(title)) > 0),
@@ -69,7 +99,7 @@ CREATE TABLE IF NOT EXISTS public.schedules (
 CREATE TABLE IF NOT EXISTS public.reports (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   school_id uuid NOT NULL REFERENCES public.schools(id) ON DELETE RESTRICT,
-  reporter_id uuid NOT NULL DEFAULT auth.uid() REFERENCES public.profiles(id) ON DELETE RESTRICT,
+  reporter_id uuid DEFAULT auth.uid() REFERENCES public.profiles(id) ON DELETE SET NULL,
   kind text NOT NULL CHECK (kind IN ('absence', 'purchase_repair', 'lost_found')),
   report_date date NOT NULL DEFAULT CURRENT_DATE,
   title text NOT NULL,
@@ -103,12 +133,27 @@ CREATE TABLE IF NOT EXISTS public.songs (
 CREATE TABLE IF NOT EXISTS public.announcements (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   school_id uuid NOT NULL REFERENCES public.schools(id) ON DELETE RESTRICT,
-  author_id uuid NOT NULL DEFAULT auth.uid() REFERENCES public.profiles(id) ON DELETE RESTRICT,
+  author_id uuid DEFAULT auth.uid() REFERENCES public.profiles(id) ON DELETE SET NULL,
   title text NOT NULL,
   body text NOT NULL DEFAULT '',
   created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT announcements_title_not_blank CHECK (length(trim(title)) > 0)
 );
+
+ALTER TABLE public.schedules ALTER COLUMN created_by DROP NOT NULL;
+ALTER TABLE public.schedules DROP CONSTRAINT IF EXISTS schedules_created_by_fkey;
+ALTER TABLE public.schedules ADD CONSTRAINT schedules_created_by_fkey
+  FOREIGN KEY (created_by) REFERENCES public.profiles(id) ON DELETE SET NULL;
+
+ALTER TABLE public.reports ALTER COLUMN reporter_id DROP NOT NULL;
+ALTER TABLE public.reports DROP CONSTRAINT IF EXISTS reports_reporter_id_fkey;
+ALTER TABLE public.reports ADD CONSTRAINT reports_reporter_id_fkey
+  FOREIGN KEY (reporter_id) REFERENCES public.profiles(id) ON DELETE SET NULL;
+
+ALTER TABLE public.announcements ALTER COLUMN author_id DROP NOT NULL;
+ALTER TABLE public.announcements DROP CONSTRAINT IF EXISTS announcements_author_id_fkey;
+ALTER TABLE public.announcements ADD CONSTRAINT announcements_author_id_fkey
+  FOREIGN KEY (author_id) REFERENCES public.profiles(id) ON DELETE SET NULL;
 
 CREATE TABLE IF NOT EXISTS public.club_settings (
   school_id uuid PRIMARY KEY REFERENCES public.schools(id) ON DELETE RESTRICT,
@@ -145,12 +190,16 @@ DECLARE
   club_name_value text;
   invite_code_value text;
   part_value text;
+  grade_text text;
+  grade_value smallint;
+  grade_as_of_value date;
   school_id_value uuid;
   admin_value boolean;
 BEGIN
   registration_mode := NEW.raw_user_meta_data ->> 'registration_mode';
   full_name_value := nullif(pg_catalog.btrim(NEW.raw_user_meta_data ->> 'full_name'), '');
   part_value := nullif(pg_catalog.btrim(NEW.raw_user_meta_data ->> 'part'), '');
+  grade_text := nullif(pg_catalog.btrim(NEW.raw_user_meta_data ->> 'grade'), '');
 
   IF full_name_value IS NULL THEN
     RAISE EXCEPTION '氏名を入力してください。';
@@ -168,6 +217,11 @@ BEGIN
     RETURNING id INTO school_id_value;
     admin_value := true;
   ELSIF registration_mode = 'join' THEN
+    IF grade_text IS NULL OR grade_text !~ '^[1-3]$' THEN
+      RAISE EXCEPTION '学年を選択してください。';
+    END IF;
+    grade_value := grade_text::smallint;
+    grade_as_of_value := (pg_catalog.timezone('Asia/Tokyo', pg_catalog.now()))::date;
     invite_code_value := pg_catalog.upper(
       pg_catalog.btrim(NEW.raw_user_meta_data ->> 'invite_code')
     );
@@ -186,8 +240,11 @@ BEGIN
     RAISE EXCEPTION '登録方法が正しくありません。';
   END IF;
 
-  INSERT INTO public.profiles (id, school_id, full_name, part, is_admin)
-  VALUES (NEW.id, school_id_value, full_name_value, part_value, admin_value);
+  INSERT INTO public.profiles (id, school_id, full_name, part, grade, grade_as_of, is_admin)
+  VALUES (NEW.id, school_id_value, full_name_value, part_value, grade_value, grade_as_of_value, admin_value);
+  INSERT INTO public.school_memberships (user_id, school_id, full_name, part, grade, grade_as_of, is_admin)
+  VALUES (NEW.id, school_id_value, full_name_value, part_value, grade_value, grade_as_of_value, admin_value)
+  ON CONFLICT (user_id, school_id) DO NOTHING;
   RETURN NEW;
 END;
 $function$;
@@ -200,6 +257,8 @@ CREATE TRIGGER provision_profile_after_signup
   FOR EACH ROW EXECUTE FUNCTION private.provision_auth_user();
 
 CREATE INDEX IF NOT EXISTS profiles_school_id_idx ON public.profiles (school_id);
+CREATE INDEX IF NOT EXISTS profiles_school_grade_name_idx ON public.profiles (school_id, grade, full_name);
+CREATE INDEX IF NOT EXISTS school_memberships_school_grade_name_idx ON public.school_memberships (school_id, grade, full_name);
 CREATE INDEX IF NOT EXISTS schedules_school_starts_idx ON public.schedules (school_id, starts_at);
 CREATE INDEX IF NOT EXISTS reports_school_date_idx ON public.reports (school_id, report_date DESC);
 CREATE INDEX IF NOT EXISTS reports_school_status_idx ON public.reports (school_id, status, created_at DESC);
@@ -226,6 +285,11 @@ CREATE TRIGGER schools_set_updated_at
 DROP TRIGGER IF EXISTS profiles_set_updated_at ON public.profiles;
 CREATE TRIGGER profiles_set_updated_at
   BEFORE UPDATE ON public.profiles
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+DROP TRIGGER IF EXISTS school_memberships_set_updated_at ON public.school_memberships;
+CREATE TRIGGER school_memberships_set_updated_at
+  BEFORE UPDATE ON public.school_memberships
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 DROP TRIGGER IF EXISTS schedules_set_updated_at ON public.schedules;
@@ -269,6 +333,21 @@ AS $function$
   LIMIT 1
 $function$;
 
+CREATE OR REPLACE FUNCTION private.is_school_member(target_school_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $function$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.school_memberships AS m
+    WHERE m.user_id = (SELECT auth.uid())
+      AND m.school_id = target_school_id
+  )
+$function$;
+
 CREATE OR REPLACE FUNCTION private.is_school_admin(target_school_id uuid)
 RETURNS boolean
 LANGUAGE sql
@@ -278,17 +357,21 @@ SET search_path = ''
 AS $function$
   SELECT EXISTS (
     SELECT 1
-    FROM public.profiles AS p
-    WHERE p.id = (SELECT auth.uid())
-      AND p.school_id = target_school_id
-      AND p.is_admin
+    FROM public.school_memberships AS m
+    WHERE m.user_id = (SELECT auth.uid())
+      AND m.school_id = target_school_id
+      AND m.is_admin
   )
 $function$;
 
 REVOKE ALL ON FUNCTION private.current_school_id() FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION private.is_school_member(uuid) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION private.is_school_admin(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION private.current_school_id() TO authenticated;
+GRANT EXECUTE ON FUNCTION private.is_school_member(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION private.is_school_admin(uuid) TO authenticated;
+
+ALTER TABLE public.school_memberships ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE public.schools ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
@@ -299,10 +382,18 @@ ALTER TABLE public.announcements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.club_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.equipment ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS school_memberships_read_group ON public.school_memberships;
+CREATE POLICY school_memberships_read_group ON public.school_memberships
+  FOR SELECT TO authenticated
+  USING (
+    user_id = (SELECT auth.uid())
+    OR (SELECT private.is_school_admin(school_id))
+  );
+
 DROP POLICY IF EXISTS schools_read_same_tenant ON public.schools;
 CREATE POLICY schools_read_same_tenant ON public.schools
   FOR SELECT TO authenticated
-  USING (id = (SELECT private.current_school_id()));
+  USING ((SELECT private.is_school_member(id)));
 
 DROP POLICY IF EXISTS schools_update_admin ON public.schools;
 CREATE POLICY schools_update_admin ON public.schools
@@ -313,7 +404,7 @@ CREATE POLICY schools_update_admin ON public.schools
 DROP POLICY IF EXISTS profiles_read_same_tenant ON public.profiles;
 CREATE POLICY profiles_read_same_tenant ON public.profiles
   FOR SELECT TO authenticated
-  USING (school_id = (SELECT private.current_school_id()));
+  USING ((id = (SELECT auth.uid())) OR (SELECT private.is_school_member(school_id)));
 
 DROP POLICY IF EXISTS profiles_insert_admin ON public.profiles;
 CREATE POLICY profiles_insert_admin ON public.profiles
@@ -344,13 +435,13 @@ CREATE POLICY profiles_delete_admin ON public.profiles
 DROP POLICY IF EXISTS schedules_read_same_tenant ON public.schedules;
 CREATE POLICY schedules_read_same_tenant ON public.schedules
   FOR SELECT TO authenticated
-  USING (school_id = (SELECT private.current_school_id()));
+  USING ((SELECT private.is_school_member(school_id)));
 
 DROP POLICY IF EXISTS schedules_insert_admin ON public.schedules;
 CREATE POLICY schedules_insert_admin ON public.schedules
   FOR INSERT TO authenticated
   WITH CHECK (
-    school_id = (SELECT private.current_school_id())
+    (SELECT private.is_school_member(school_id))
     AND created_by = (SELECT auth.uid())
     AND (SELECT private.is_school_admin(school_id))
   );
@@ -359,7 +450,7 @@ DROP POLICY IF EXISTS schedules_update_admin ON public.schedules;
 CREATE POLICY schedules_update_admin ON public.schedules
   FOR UPDATE TO authenticated
   USING ((SELECT private.is_school_admin(school_id)))
-  WITH CHECK (school_id = (SELECT private.current_school_id()));
+  WITH CHECK ((SELECT private.is_school_member(school_id)));
 
 DROP POLICY IF EXISTS schedules_delete_admin ON public.schedules;
 CREATE POLICY schedules_delete_admin ON public.schedules
@@ -369,13 +460,13 @@ CREATE POLICY schedules_delete_admin ON public.schedules
 DROP POLICY IF EXISTS reports_read_same_tenant ON public.reports;
 CREATE POLICY reports_read_same_tenant ON public.reports
   FOR SELECT TO authenticated
-  USING (school_id = (SELECT private.current_school_id()));
+  USING ((SELECT private.is_school_member(school_id)));
 
 DROP POLICY IF EXISTS reports_insert_same_tenant ON public.reports;
 CREATE POLICY reports_insert_same_tenant ON public.reports
   FOR INSERT TO authenticated
   WITH CHECK (
-    school_id = (SELECT private.current_school_id())
+    (SELECT private.is_school_member(school_id))
     AND reporter_id = (SELECT auth.uid())
   );
 
@@ -383,7 +474,7 @@ DROP POLICY IF EXISTS reports_update_admin ON public.reports;
 CREATE POLICY reports_update_admin ON public.reports
   FOR UPDATE TO authenticated
   USING ((SELECT private.is_school_admin(school_id)))
-  WITH CHECK (school_id = (SELECT private.current_school_id()));
+  WITH CHECK ((SELECT private.is_school_member(school_id)));
 
 DROP POLICY IF EXISTS reports_delete_admin ON public.reports;
 CREATE POLICY reports_delete_admin ON public.reports
@@ -393,7 +484,7 @@ CREATE POLICY reports_delete_admin ON public.reports
 DROP POLICY IF EXISTS songs_read_same_tenant ON public.songs;
 CREATE POLICY songs_read_same_tenant ON public.songs
   FOR SELECT TO authenticated
-  USING (school_id = (SELECT private.current_school_id()));
+  USING ((SELECT private.is_school_member(school_id)));
 
 DROP POLICY IF EXISTS songs_insert_admin ON public.songs;
 CREATE POLICY songs_insert_admin ON public.songs
@@ -404,7 +495,7 @@ DROP POLICY IF EXISTS songs_update_admin ON public.songs;
 CREATE POLICY songs_update_admin ON public.songs
   FOR UPDATE TO authenticated
   USING ((SELECT private.is_school_admin(school_id)))
-  WITH CHECK (school_id = (SELECT private.current_school_id()));
+  WITH CHECK ((SELECT private.is_school_member(school_id)));
 
 DROP POLICY IF EXISTS songs_delete_admin ON public.songs;
 CREATE POLICY songs_delete_admin ON public.songs
@@ -414,13 +505,13 @@ CREATE POLICY songs_delete_admin ON public.songs
 DROP POLICY IF EXISTS announcements_read_same_tenant ON public.announcements;
 CREATE POLICY announcements_read_same_tenant ON public.announcements
   FOR SELECT TO authenticated
-  USING (school_id = (SELECT private.current_school_id()));
+  USING ((SELECT private.is_school_member(school_id)));
 
 DROP POLICY IF EXISTS announcements_insert_admin ON public.announcements;
 CREATE POLICY announcements_insert_admin ON public.announcements
   FOR INSERT TO authenticated
   WITH CHECK (
-    school_id = (SELECT private.current_school_id())
+    (SELECT private.is_school_member(school_id))
     AND author_id = (SELECT auth.uid())
     AND (SELECT private.is_school_admin(school_id))
   );
@@ -433,13 +524,13 @@ CREATE POLICY announcements_delete_admin ON public.announcements
 DROP POLICY IF EXISTS club_settings_read_same_tenant ON public.club_settings;
 CREATE POLICY club_settings_read_same_tenant ON public.club_settings
   FOR SELECT TO authenticated
-  USING (school_id = (SELECT private.current_school_id()));
+  USING ((SELECT private.is_school_member(school_id)));
 
 DROP POLICY IF EXISTS club_settings_insert_admin ON public.club_settings;
 CREATE POLICY club_settings_insert_admin ON public.club_settings
   FOR INSERT TO authenticated
   WITH CHECK (
-    school_id = (SELECT private.current_school_id())
+    (SELECT private.is_school_member(school_id))
     AND (SELECT private.is_school_admin(school_id))
   );
 
@@ -447,12 +538,12 @@ DROP POLICY IF EXISTS club_settings_update_admin ON public.club_settings;
 CREATE POLICY club_settings_update_admin ON public.club_settings
   FOR UPDATE TO authenticated
   USING ((SELECT private.is_school_admin(school_id)))
-  WITH CHECK (school_id = (SELECT private.current_school_id()));
+  WITH CHECK ((SELECT private.is_school_member(school_id)));
 
 DROP POLICY IF EXISTS equipment_read_same_tenant ON public.equipment;
 CREATE POLICY equipment_read_same_tenant ON public.equipment
   FOR SELECT TO authenticated
-  USING (school_id = (SELECT private.current_school_id()));
+  USING ((SELECT private.is_school_member(school_id)));
 
 DROP POLICY IF EXISTS equipment_insert_admin ON public.equipment;
 CREATE POLICY equipment_insert_admin ON public.equipment
@@ -463,7 +554,7 @@ DROP POLICY IF EXISTS equipment_update_admin ON public.equipment;
 CREATE POLICY equipment_update_admin ON public.equipment
   FOR UPDATE TO authenticated
   USING ((SELECT private.is_school_admin(school_id)))
-  WITH CHECK (school_id = (SELECT private.current_school_id()));
+  WITH CHECK ((SELECT private.is_school_member(school_id)));
 
 DROP POLICY IF EXISTS equipment_delete_admin ON public.equipment;
 CREATE POLICY equipment_delete_admin ON public.equipment
@@ -472,10 +563,11 @@ CREATE POLICY equipment_delete_admin ON public.equipment
 
 -- RLS is necessary but table privileges are also required for Supabase roles.
 REVOKE ALL ON TABLE public.schools, public.profiles, public.schedules,
-  public.reports, public.songs, public.announcements, public.club_settings,
+  public.school_memberships, public.reports, public.songs, public.announcements, public.club_settings,
   public.equipment FROM anon, authenticated;
 
 GRANT SELECT ON TABLE public.schools TO authenticated;
+GRANT SELECT ON TABLE public.school_memberships TO authenticated;
 GRANT UPDATE (school_name, club_name, google_account_email, google_drive_folder_url)
   ON public.schools TO authenticated;
 
@@ -535,7 +627,7 @@ CREATE POLICY report_photos_read_same_tenant ON storage.objects
   FOR SELECT TO authenticated
   USING (
     bucket_id = 'report-photos'
-    AND (storage.foldername(name))[1] = (SELECT private.current_school_id())::text
+    AND (SELECT private.is_school_member(((storage.foldername(name))[1])::uuid))
   );
 
 DROP POLICY IF EXISTS report_photos_upload_same_tenant ON storage.objects;
@@ -543,7 +635,7 @@ CREATE POLICY report_photos_upload_same_tenant ON storage.objects
   FOR INSERT TO authenticated
   WITH CHECK (
     bucket_id = 'report-photos'
-    AND (storage.foldername(name))[1] = (SELECT private.current_school_id())::text
+    AND (SELECT private.is_school_member(((storage.foldername(name))[1])::uuid))
   );
 
 DROP POLICY IF EXISTS report_photos_delete_admin ON storage.objects;
@@ -551,8 +643,7 @@ CREATE POLICY report_photos_delete_admin ON storage.objects
   FOR DELETE TO authenticated
   USING (
     bucket_id = 'report-photos'
-    AND (storage.foldername(name))[1] = (SELECT private.current_school_id())::text
-    AND (SELECT private.is_school_admin((SELECT private.current_school_id())))
+    AND (SELECT private.is_school_admin(((storage.foldername(name))[1])::uuid))
   );
 
 DROP POLICY IF EXISTS song_audio_read_same_tenant ON storage.objects;
@@ -560,7 +651,7 @@ CREATE POLICY song_audio_read_same_tenant ON storage.objects
   FOR SELECT TO authenticated
   USING (
     bucket_id = 'song-audio'
-    AND (storage.foldername(name))[1] = (SELECT private.current_school_id())::text
+    AND (SELECT private.is_school_member(((storage.foldername(name))[1])::uuid))
   );
 
 DROP POLICY IF EXISTS song_audio_upload_admin ON storage.objects;
@@ -568,8 +659,7 @@ CREATE POLICY song_audio_upload_admin ON storage.objects
   FOR INSERT TO authenticated
   WITH CHECK (
     bucket_id = 'song-audio'
-    AND (storage.foldername(name))[1] = (SELECT private.current_school_id())::text
-    AND (SELECT private.is_school_admin((SELECT private.current_school_id())))
+    AND (SELECT private.is_school_admin(((storage.foldername(name))[1])::uuid))
   );
 
 DROP POLICY IF EXISTS song_audio_update_admin ON storage.objects;
@@ -577,13 +667,11 @@ CREATE POLICY song_audio_update_admin ON storage.objects
   FOR UPDATE TO authenticated
   USING (
     bucket_id = 'song-audio'
-    AND (storage.foldername(name))[1] = (SELECT private.current_school_id())::text
-    AND (SELECT private.is_school_admin((SELECT private.current_school_id())))
+    AND (SELECT private.is_school_admin(((storage.foldername(name))[1])::uuid))
   )
   WITH CHECK (
     bucket_id = 'song-audio'
-    AND (storage.foldername(name))[1] = (SELECT private.current_school_id())::text
-    AND (SELECT private.is_school_admin((SELECT private.current_school_id())))
+    AND (SELECT private.is_school_admin(((storage.foldername(name))[1])::uuid))
   );
 
 DROP POLICY IF EXISTS song_audio_delete_admin ON storage.objects;
@@ -591,8 +679,7 @@ CREATE POLICY song_audio_delete_admin ON storage.objects
   FOR DELETE TO authenticated
   USING (
     bucket_id = 'song-audio'
-    AND (storage.foldername(name))[1] = (SELECT private.current_school_id())::text
-    AND (SELECT private.is_school_admin((SELECT private.current_school_id())))
+    AND (SELECT private.is_school_admin(((storage.foldername(name))[1])::uuid))
   );
 
 -- Realtime only works for tables included in the Supabase publication.
@@ -607,7 +694,7 @@ BEGIN
   END IF;
 
   FOREACH table_name IN ARRAY ARRAY[
-    'schools', 'profiles', 'schedules', 'reports', 'songs',
+    'schools', 'profiles', 'school_memberships', 'schedules', 'reports', 'songs',
     'announcements', 'club_settings', 'equipment'
   ] LOOP
     IF NOT EXISTS (

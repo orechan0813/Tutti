@@ -37,6 +37,10 @@
     .club-name { font-weight: 700; font-size: 12px; }
     .club-school { color: var(--muted); font-size: 11px; }
     .club-arrow { margin-left: auto; color: var(--muted); }
+    .group-picker { display: grid; gap: 7px; }
+    .group-picker-item { width: 100%; display: flex; align-items: center; gap: 10px; padding: 11px; border: 1px solid var(--line); border-radius: 8px; background: #fff; text-align: left; cursor: pointer; }
+    .group-picker-item.active { border-color: #93b8a4; background: var(--green-pale); }
+    .group-picker-item span:last-child { min-width: 0; }
     .nav-label { padding: 0 12px 8px; color: #9aa39d; font-size: 10px; font-weight: 700; letter-spacing: .08em; }
     .nav-list { display: grid; gap: 4px; flex: 0 0 auto; }
     .nav-item { width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 12px; text-decoration: none; border: 0; border-radius: 8px; background: transparent; color: #65726b; text-align: left; cursor: pointer; font-size: 13px; }
@@ -164,6 +168,12 @@
     .member-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #edf0ec; }
     .member-row:last-child { border: 0; }
     .member-role { margin-left: auto; color: var(--muted); font-size: 10px; }
+    .member-grade-group + .member-grade-group { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+    .member-grade-title { margin: 0 0 10px; color: var(--green); font-size: 13px; }
+    .member-part-group + .member-part-group { margin-top: 12px; }
+    .member-part-title { margin: 0; color: var(--muted); font-size: 10px; font-weight: 700; }
+    .member-actions { display: flex; align-items: center; gap: 6px; }
+    .member-actions .secondary-button, .member-actions .danger-button { min-height: 30px; padding: 0 9px; font-size: 10px; }
     .switch { position: relative; width: 34px; height: 20px; border: 0; border-radius: 99px; background: #d7ddd8; cursor: pointer; }
     .switch:after { content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: white; transition: transform .18s ease; }
     .switch.on { background: var(--green); }
@@ -350,7 +360,7 @@
         { id: 'song-5', title: '銀河鉄道999', byline: 'タケカワ ユキヒデ / 樽屋 雅徳 編曲', sortKey: 'Galaxy Express 999', drive: 'https://drive.google.com/', youtube: 'https://www.youtube.com/results?search_query=Galaxy+Express+999+wind+orchestra' }
       ]
     };
-    const emptyWorkspace = () => ({ isAdmin: false, schoolId: null, schoolName: '', clubName: '', inviteCode: '', userName: '', userId: null, theme: { page: '#f3f5ef', ink: '#19332f', font: 'DM Sans' }, events: [], notices: [], absences: [], meters: [], lost: null, requests: [], members: [], songs: [] });
+    const emptyWorkspace = () => ({ isAdmin: false, schoolId: null, schoolName: '', clubName: '', inviteCode: '', userName: '', userId: null, groups: [], theme: { page: '#f3f5ef', ink: '#19332f', font: 'DM Sans' }, events: [], notices: [], absences: [], meters: [], lost: null, requests: [], members: [], songs: [] });
     let data = emptyWorkspace();
     let currentSession = null;
     let currentProfile = null;
@@ -409,10 +419,20 @@
     const reportKindLabel = kind => ({ absence: '遅刻・欠席', purchase_repair: '購入・修理', lost_found: '落とし物' }[kind] || kind);
     const reportStatusLabel = status => ({ pending: '確認待ち', approved: '確認済み', rejected: '却下', resolved: '対応済み' }[status] || status);
     const formatPart = part => String(part || '').split(/[,、，／]|\s\/\s/).map(value => value.trim()).filter(Boolean).join(' / ');
+    function currentGrade(grade, gradeAsOf) {
+      if (!grade || !gradeAsOf) return null;
+      const schoolYear = value => {
+        const [year, month, day] = value.split('-').map(Number);
+        return year - (month < 4 || (month === 4 && day < 2) ? 1 : 0);
+      };
+      const today = japanDateKey(new Date());
+      return Math.max(1, Math.min(3, Number(grade) + schoolYear(today) - schoolYear(gradeAsOf)));
+    }
+    const gradeLabel = grade => grade ? `高校${grade}年` : '学年未設定';
     const toJapanTime = value => new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(value));
-    async function loadWorkspace(user) {
+    async function loadWorkspace(user, requestedSchoolId = data.schoolId) {
       const sequence = ++loadSequence;
-      const profile = checkedData(await supabaseClient.from('profiles').select('id, school_id, full_name, part, is_admin').eq('id', user.id).maybeSingle());
+      const profile = checkedData(await supabaseClient.from('profiles').select('id, school_id, full_name, part, grade, grade_as_of, is_admin').eq('id', user.id).maybeSingle());
       if (sequence !== loadSequence) return;
       if (!profile) {
         currentProfile = null;
@@ -421,17 +441,63 @@
         return;
       }
       currentProfile = profile;
-      const schoolId = profile.school_id;
-      data.schoolId = schoolId;
-      const metadata = user.user_metadata || {};
-      const registeredParts = [metadata.part_primary, metadata.part_secondary].filter(Boolean).join(' / ');
-      if (!profile.part && registeredParts) {
-        checkedData(await supabaseClient.from('profiles').update({ part: registeredParts }).eq('id', user.id).eq('school_id', schoolId));
-        profile.part = registeredParts;
+      let memberships = await readRows(
+        supabaseClient.from('school_memberships').select('user_id, school_id, full_name, part, grade, grade_as_of, is_admin').eq('user_id', user.id),
+        'school_memberships'
+      );
+      if (!memberships.length) {
+        const legacyMembers = await readRows(
+          supabaseClient.from('profiles').select('id, school_id, full_name, part, grade, grade_as_of, is_admin').eq('school_id', profile.school_id),
+          'profiles'
+        );
+        memberships = legacyMembers.map(member => ({
+          user_id: member.id,
+          school_id: member.school_id,
+          full_name: member.full_name,
+          part: member.part,
+          grade: member.grade,
+          grade_as_of: member.grade_as_of,
+          is_admin: member.is_admin,
+        }));
+        if (!memberships.length) {
+          memberships = [{
+            user_id: profile.id,
+            school_id: profile.school_id,
+            full_name: profile.full_name,
+            part: profile.part,
+            grade: profile.grade,
+            grade_as_of: profile.grade_as_of,
+            is_admin: profile.is_admin,
+          }];
+        }
       }
-      const [school, members, scheduleRows, reports, songRows, announcementRows, settingsData, equipmentRows] = await Promise.all([
-        supabaseClient.from('schools').select('id, school_name, club_name, invite_code').eq('id', schoolId).single(),
-        readRows(supabaseClient.from('profiles').select('id, full_name, part, is_admin').eq('school_id', schoolId).order('full_name'), 'profiles'),
+      const schoolIds = [...new Set(memberships.map(membership => membership.school_id))];
+      const schoolRows = await readRows(
+        supabaseClient.from('schools').select('id, school_name, club_name, invite_code').in('id', schoolIds),
+        'schools'
+      );
+      const groups = memberships.map(membership => {
+        const school = schoolRows.find(item => item.id === membership.school_id);
+        return school ? {
+          id: school.id,
+          schoolName: school.school_name,
+          clubName: school.club_name,
+          fullName: membership.full_name,
+          part: formatPart(membership.part),
+          grade: currentGrade(membership.grade, membership.grade_as_of),
+          isAdmin: membership.is_admin,
+        } : null;
+      }).filter(Boolean);
+      const activeMembership = memberships.find(item => item.school_id === requestedSchoolId)
+        || memberships.find(item => item.school_id === profile.school_id)
+        || memberships[0];
+      if (!activeMembership) throw new Error('参加中の団体が見つかりません。');
+      const schoolId = activeMembership.school_id;
+      const schoolData = schoolRows.find(item => item.id === schoolId);
+      if (!schoolData) throw new Error('所属団体の情報を取得できません。');
+      data.schoolId = schoolId;
+      const [members, scheduleRows, reports, songRows, announcementRows, settingsData, equipmentRows] = await Promise.all([
+        readRows(supabaseClient.from('school_memberships').select('user_id, school_id, full_name, part, grade, grade_as_of, is_admin').eq('school_id', schoolId).order('full_name'), 'school_memberships'),
         readRows(supabaseClient.from('schedules').select('id, title, content, starts_at, ends_at, location').eq('school_id', schoolId).order('starts_at'), 'schedules'),
         readRows(supabaseClient.from('reports').select('id, reporter_id, kind, report_date, title, reason, arrival_at, photo_url, status, created_at').eq('school_id', schoolId).order('created_at', { ascending: false }), 'reports'),
         readRows(supabaseClient.from('songs').select('id, title, sort_reading, composer, arranger, drive_url, youtube_url, audio_file_path').eq('school_id', schoolId), 'songs'),
@@ -440,7 +506,6 @@
         readRows(supabaseClient.from('equipment').select('id, name, borrower_id').eq('school_id', schoolId).order('name'), 'equipment')
       ]);
       if (sequence !== loadSequence) return;
-      const schoolData = checkedData(school);
       const reportsForView = await Promise.all(reports.map(async report => {
         let photoUrl = '';
         if (report.photo_url) {
@@ -452,20 +517,21 @@
       data = {
         ...data,
         schoolId,
+        groups,
         schoolName: schoolData.school_name,
         clubName: schoolData.club_name,
         inviteCode: schoolData.invite_code,
-        userName: profile.full_name,
+        userName: activeMembership.full_name,
         userId: profile.id,
-        isAdmin: profile.is_admin,
-        members: members.map(member => ({ id: member.id, name: member.full_name, part: formatPart(member.part), role: member.is_admin })),
+        isAdmin: activeMembership.is_admin,
+        members: members.map(member => ({ id: member.user_id, name: member.full_name, part: formatPart(member.part), grade: currentGrade(member.grade, member.grade_as_of), role: member.is_admin })),
         events: scheduleRows.map(item => ({ id: item.id, date: japanDateKey(item.starts_at), time: toJapanTime(item.starts_at), title: item.title, place: item.location, detail: item.content })),
-        requests: reportsForView.map(item => ({ id: item.id, dbStatus: item.status, type: reportKindLabel(item.kind), kind: item.kind, title: item.title, body: [item.reason, item.arrival_at ? `到着予定 ${item.arrival_at.slice(0,5)}` : ''].filter(Boolean).join(' · '), name: members.find(member => member.id === item.reporter_id)?.full_name || '部員', date: item.report_date, status: reportStatusLabel(item.status), photoPath: item.photo_url, photoUrl: item.photoUrl })),
-        absences: reports.filter(item => item.kind === 'absence').map(item => ({ id: item.id, name: members.find(member => member.id === item.reporter_id)?.full_name || '部員', detail: [item.reason, item.arrival_at ? `到着予定 ${item.arrival_at.slice(0,5)}` : '欠席'].filter(Boolean).join(' · '), date: item.report_date })),
+        requests: reportsForView.map(item => ({ id: item.id, dbStatus: item.status, type: reportKindLabel(item.kind), kind: item.kind, title: item.title, body: [item.reason, item.arrival_at ? `到着予定 ${item.arrival_at.slice(0,5)}` : ''].filter(Boolean).join(' · '), name: members.find(member => member.user_id === item.reporter_id)?.full_name || '部員', date: item.report_date, status: reportStatusLabel(item.status), photoPath: item.photo_url, photoUrl: item.photoUrl })),
+        absences: reports.filter(item => item.kind === 'absence').map(item => ({ id: item.id, name: members.find(member => member.user_id === item.reporter_id)?.full_name || '部員', detail: [item.reason, item.arrival_at ? `到着予定 ${item.arrival_at.slice(0,5)}` : '欠席'].filter(Boolean).join(' · '), date: item.report_date })),
         songs: songRows.map(item => ({ id: item.id, title: item.title, byline: [item.composer, item.arranger && `${item.arranger} 編曲`].filter(Boolean).join(' / '), sortKey: item.sort_reading, drive: item.drive_url, youtube: item.youtube_url, audioKey: item.audio_file_path })),
         notices: announcementRows.map(item => ({ id: item.id, title: item.title, body: item.body, date: japanDateKey(item.created_at), mark: '♪' })),
         theme: settingsData ? { page: settingsData.theme_page, ink: settingsData.theme_ink, font: settingsData.theme_font } : { page: '#f3f5ef', ink: '#19332f', font: 'DM Sans' },
-        meters: equipmentRows.map(item => ({ id: item.id, name: item.name, status: item.borrower_id ? `貸出中 · ${members.find(member => member.id === item.borrower_id)?.full_name || '部員'}` : '貸出できます' })),
+        meters: equipmentRows.map(item => ({ id: item.id, name: item.name, status: item.borrower_id ? `貸出中 · ${members.find(member => member.user_id === item.borrower_id)?.full_name || '部員'}` : '貸出できます' })),
         lost: { title: '落とし物の報告はありません', body: '', image: '', date: dayKey(new Date()) }
       };
       const lostReport = reportsForView.find(item => item.kind === 'lost_found' && item.status !== 'rejected');
@@ -476,7 +542,7 @@
       authMessage = '';
       subscribeToWorkspace(schoolId);
       render();
-      if (profile.is_admin && user.user_metadata?.registration_mode === 'create') {
+      if (activeMembership.is_admin && user.user_metadata?.registration_mode === 'create') {
         sendOrganizationWelcome(user.id).catch(error => {
           welcomeEmailAttempts.delete(user.id);
           console.error('Organization welcome email failed', error);
@@ -507,6 +573,7 @@
       for (const table of ['profiles', 'schedules', 'reports', 'songs', 'announcements', 'club_settings', 'equipment']) {
         channel.on('postgres_changes', { event: '*', schema: 'public', table, filter: `school_id=eq.${schoolId}` }, refresh);
       }
+      channel.on('postgres_changes', { event: '*', schema: 'public', table: 'school_memberships', filter: `user_id=eq.${currentSession.user.id}` }, refresh);
       channel.on('postgres_changes', { event: '*', schema: 'public', table: 'schools', filter: `id=eq.${schoolId}` }, refresh);
       realtimeChannel = channel.subscribe(status => {
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') showToast('Realtime接続を再試行しています');
@@ -520,7 +587,7 @@
       const message = authMessage || (signedIn ? '所属団体のデータを読み込んでいます。' : registering ? signupType === 'create' ? '団体と管理者アカウントを作成します。' : '招待コードを使って既存の団体に参加します。' : 'メールアドレスとパスワードでログインしてください。');
       const registrationOptions = `<fieldset class="field full" style="border:0;padding:0;margin:0"><legend class="field" style="margin-bottom:7px">登録方法</legend><div class="auth-mode-options"><label class="auth-mode-option"><input type="radio" name="registrationMode" value="create" ${signupType === 'create' ? 'checked' : ''} required><span>部活・団体を新しく登録する（管理者アカウント）</span></label><label class="auth-mode-option"><input type="radio" name="registrationMode" value="join" ${signupType === 'join' ? 'checked' : ''} required><span>既存の部活に参加する（一般部員アカウント）</span></label></div></fieldset>`;
       const organizationFields = '<div class="field full"><label for="authSchoolName">学校名</label><input id="authSchoolName" name="schoolName" autocomplete="organization" placeholder="例：青葉高校" required></div><div class="field full"><label for="authClubName">部活・団体名</label><input id="authClubName" name="clubName" placeholder="例：吹奏楽部" required></div>';
-      const memberFields = '<div class="field"><label for="authPartPrimary">メインパート</label><input id="authPartPrimary" name="partPrimary" autocomplete="off" placeholder="例：Alto Sax" required></div><div class="field"><label for="authPartSecondary">サブパート（任意）</label><input id="authPartSecondary" name="partSecondary" autocomplete="off" placeholder="例：Piano"></div><div class="field full"><label for="authInviteCode">招待コード</label><input id="authInviteCode" name="inviteCode" autocomplete="off" autocapitalize="characters" minlength="12" maxlength="12" pattern="[A-Fa-f0-9]{12}" placeholder="12桁のコード" required></div><div class="field full"><label for="authFullName">氏名</label><input id="authFullName" name="fullName" autocomplete="name" required></div>';
+      const memberFields = '<div class="field"><label for="authGrade">現在の学年</label><select id="authGrade" name="grade" required><option value="">学年を選択</option><option value="1">高校1年</option><option value="2">高校2年</option><option value="3">高校3年</option></select></div><div class="field"><label for="authPartPrimary">メインパート</label><input id="authPartPrimary" name="partPrimary" autocomplete="off" placeholder="例：Alto Sax" required></div><div class="field"><label for="authPartSecondary">サブパート（任意）</label><input id="authPartSecondary" name="partSecondary" autocomplete="off" placeholder="例：Piano"></div><div class="field full"><label for="authInviteCode">招待コード</label><input id="authInviteCode" name="inviteCode" autocomplete="off" autocapitalize="characters" minlength="12" maxlength="12" pattern="[A-Fa-f0-9]{12}" placeholder="12桁のコード" required></div><div class="field full"><label for="authFullName">氏名</label><input id="authFullName" name="fullName" autocomplete="name" required></div>';
       const signupFields = registering ? `${registrationOptions}${signupType === 'create' ? organizationFields : memberFields}` : '';
       const signedInActions = '<button class="secondary-button" data-auth-action="sign-out">ログアウト</button>';
       const authForm = `<form id="authForm" class="field-grid">${signupFields}<div class="field full"><label for="authEmail">メールアドレス</label><input id="authEmail" name="email" type="email" autocomplete="email" required></div><div class="field full"><label for="authPassword">パスワード</label><input id="authPassword" name="password" type="password" autocomplete="${registering ? 'new-password' : 'current-password'}" minlength="6" required></div><div class="field full"><button class="primary-button" type="submit">${registering ? '登録する' : 'ログイン'}</button></div></form><button class="secondary-button" style="width:100%;margin-top:9px" data-auth-action="toggle-mode">${registering ? 'ログイン画面に戻る' : '新規部員登録'}</button>`;
@@ -630,12 +697,32 @@
       const search = document.getElementById('songSearch');
       if (search) search.addEventListener('input', event => { const position = event.target.selectionStart; renderLibrary(event.target.value); const next = document.getElementById('songSearch'); next.focus(); next.setSelectionRange(position,position); });
     }
+    function renderMemberGroups() {
+      const grades = [1, 2, 3, null];
+      return grades.map(grade => {
+        const gradeMembers = data.members.filter(member => member.grade === grade);
+        if (!gradeMembers.length) return '';
+        const parts = [...new Set(gradeMembers.map(member => member.part?.split(' / ')[0] || 'パート未設定'))]
+          .sort((left, right) => left.localeCompare(right, 'ja'));
+        const partGroups = parts.map(part => {
+          const members = gradeMembers
+            .filter(member => (member.part?.split(' / ')[0] || 'パート未設定') === part)
+            .sort((left, right) => left.name.localeCompare(right.name, 'ja'));
+          return `<section class="member-part-group"><h4 class="member-part-title">${escapeHtml(part)}</h4>${members.map(member => {
+            const index = data.members.indexOf(member);
+            return `<div class="member-row"><div class="mini-avatar">${escapeHtml(initials(member.name))}</div><div class="person-info"><div class="person-name">${escapeHtml(member.name)}</div><div class="person-detail">${escapeHtml(member.part || 'パート未設定')}</div></div><div class="member-actions"><button class="switch ${member.role?'on':''}" data-action="member-role" data-index="${index}" aria-label="${escapeHtml(member.name)}の管理者権限"></button><span class="member-role">${member.role?'幹部':'部員'}</span><button class="secondary-button" data-action="edit-member" data-index="${index}">編集</button><button class="danger-button" data-action="delete-member" data-id="${escapeHtml(member.id)}" ${member.id===data.userId?'disabled':''}>団体から外す</button></div></div>`;
+          }).join('')}</section>`;
+        }).join('');
+        return `<section class="member-grade-group"><h3 class="member-grade-title">${grade ? `高校${grade}年` : '学年未設定'}</h3>${partGroups}</section>`;
+      }).join('');
+    }
     function renderAdmin() {
       const pending = data.requests.filter(item => item.status === '確認待ち');
+      const memberGroups = renderMemberGroups();
       content.innerHTML = `<div class="welcome-row"><div><div class="eyebrow">CLUB MANAGEMENT</div><h1>管理者画面</h1><div class="subheading">${escapeHtml(data.schoolName)} · ${escapeHtml(data.clubName)}の運営を管理します。</div></div></div>
         <div class="grid admin-grid"><div class="stack">
           <section class="panel"><div class="panel-head"><div><div class="panel-title">連絡フォームの投稿</div><div class="panel-note">確認待ち ${pending.length}件 · 投稿を承認または対応済みにできます</div></div></div><div class="request-list">${data.requests.length?data.requests.map(item => `<div class="request-row"><div><div class="request-title">${escapeHtml(item.title)}</div><div class="request-copy">${escapeHtml(item.body)}</div><div class="request-meta"><span>${escapeHtml(item.type)}</span><span>·</span><span>${escapeHtml(item.name)}</span><span>·</span><span>${escapeHtml(dateLabel(item.date))}</span></div></div><div class="inline-actions"><span class="request-state ${item.status==='対応済み'?'approved':item.status==='却下'?'rejected':''}">${escapeHtml(item.status)}</span>${item.status==='確認待ち'?`<button class="secondary-button" data-action="request-status" data-id="${item.id}" data-status="対応済み">確認</button><button class="danger-button" data-action="request-status" data-id="${item.id}" data-status="却下">却下</button>`:''}</div></div>`).join(''):'<div class="empty-state">新しい投稿はありません。</div>'}</div></section>
-          <section class="panel"><div class="panel-head"><div><div class="panel-title">部員と権限</div><div class="panel-note">幹部級の管理者権限を設定</div></div><span class="panel-note">${data.members.length}名</span></div><div class="panel-body">${data.members.map((member,index) => `<div class="member-row"><div class="mini-avatar">${escapeHtml(initials(member.name))}</div><div class="person-info"><div class="person-name">${escapeHtml(member.name)}</div><div class="person-detail">${escapeHtml(member.part || 'パート未設定')}</div></div><span class="member-role">${member.role?'幹部':'部員'}</span><button class="switch ${member.role?'on':''}" data-action="member-role" data-index="${index}" aria-label="${escapeHtml(member.name)}の管理者権限"></button></div>`).join('')}</div></section>
+          <section class="panel"><div class="panel-head"><div><div class="panel-title">部員管理</div><div class="panel-note">学年、パートの順に表示</div></div><span class="panel-note">${data.members.length}名</span></div><div class="panel-body">${memberGroups || '<div class="empty-state">部員はいません。</div>'}</div></section>
           <section class="panel"><div class="panel-head"><div><div class="panel-title">団体のデザイン</div><div class="panel-note">背景色・文字色・フォントをカスタマイズ</div></div></div><div class="panel-body"><div class="theme-preview" id="themePreview"><strong>青葉高校 吹奏楽部</strong><span>この団体のテーマプレビュー</span></div><div class="theme-controls"><label class="color-field">背景色 <input type="color" id="themePage" value="${escapeHtml(data.theme.page)}"></label><label class="color-field">文字色 <input type="color" id="themeInk" value="${escapeHtml(data.theme.ink)}"></label></div><div class="field" style="margin-top:12px"><label for="themeFont">フォント</label><select id="themeFont"><option ${data.theme.font==='DM Sans'?'selected':''}>DM Sans</option><option ${data.theme.font==='Noto Sans JP'?'selected':''}>Noto Sans JP</option></select></div><div style="display:flex;justify-content:flex-end;margin-top:12px"><button class="primary-button" data-action="save-theme">テーマを保存</button></div></div></section>
         </div><div class="stack">
           <section class="panel"><div class="panel-head"><div><div class="panel-title">練習予定を作成</div><div class="panel-note">カレンダーとホームに表示</div></div></div><div class="panel-body"><form id="eventForm" class="field-grid"><div class="field"><label for="eventDate">日付</label><input id="eventDate" type="date" required value="${shiftDay(1)}"></div><div class="field"><label for="eventTime">開始時刻</label><input id="eventTime" type="time" required value="16:00"></div><div class="field full"><label for="eventTitle">練習内容</label><input id="eventTitle" required placeholder="例：合奏練習"></div><div class="field full"><label for="eventPlace">場所</label><input id="eventPlace" required placeholder="例：音楽室"></div><div class="field full"><label for="eventDetail">詳細</label><input id="eventDetail" placeholder="練習内容など"></div><div class="field full"><button class="primary-button" type="submit">予定を追加</button></div></form></div></section>
@@ -653,6 +740,10 @@
       modalBackdrop.classList.add('open');
     }
     function closeModal() { modalBackdrop.classList.remove('open'); }
+    function openGroupSwitcher() {
+      const options = (data.groups || []).map(group => `<button type="button" class="group-picker-item ${group.id===data.schoolId?'active':''}" data-action="switch-group" data-school-id="${escapeHtml(group.id)}"><span class="club-avatar">${escapeHtml(initials(group.schoolName))}</span><span><strong>${escapeHtml(group.clubName)}</strong><br><span class="panel-note">${escapeHtml(group.schoolName)} · ${group.isAdmin?'管理者':'部員'}</span></span></button>`).join('');
+      openModal('所属グループを選択', `<div class="group-picker">${options || '<div class="empty-state">参加中の団体はありません。</div>'}</div><div class="nav-divider"></div><form id="joinGroupForm" class="field-grid"><div class="field full"><label for="joinGroupInviteCode">別の団体に参加</label><input id="joinGroupInviteCode" name="inviteCode" autocomplete="off" autocapitalize="characters" minlength="12" maxlength="12" pattern="[A-Fa-f0-9]{12}" placeholder="12桁の招待コード" required></div><div class="field full"><button type="submit" class="secondary-button">＋ グループに参加</button></div></form>`);
+    }
     function formMarkup(type) {
       if (type === 'absence') return `<form id="absenceForm"><div class="field"><label>連絡内容</label><div class="reason-options"><button type="button" class="reason-option kind-option ${absenceKind==='欠席'?'selected':''}" data-kind="欠席">欠席</button><button type="button" class="reason-option kind-option ${absenceKind==='遅刻'?'selected':''}" data-kind="遅刻">遅刻</button></div></div><div class="field" style="margin-top:15px"><label>理由</label><div class="reason-options" id="reasonOptions">${['他部活への参加','家の用事','習い事','体調不良','公欠','その他'].map(reason => `<button type="button" class="reason-option ${reason===selectedReason?'selected':''}" data-reason="${reason}">${reason}</button>`).join('')}</div></div><div class="field" style="margin-top:17px"><label>対象日</label><input name="date" type="date" required value="${dayKey(new Date())}"></div><div class="field" id="arrivalField" style="margin-top:17px" ${absenceKind==='遅刻'?'':'hidden'}><label>到着予定時刻</label><div class="clock-controls"><div class="clock-dial" id="clockDial"><div class="clock-hand" id="clockHand"></div><div class="clock-center"></div></div><div class="ampm"><button type="button" class="${clockPeriod==='午前'?'selected':''}" data-period="午前">午前</button><button type="button" class="${clockPeriod==='午後'?'selected':''}" data-period="午後">午後</button></div></div><div class="clock-hint" id="clockHint">${clockPeriod} ${clockHour}:00 頃に到着予定</div></div><div class="field" style="margin-top:16px"><label for="absenceNote">補足</label><textarea id="absenceNote" placeholder="必要な連絡があれば入力してください"></textarea></div><div class="modal-footer"><button type="button" class="secondary-button" data-action="close-modal">キャンセル</button><button type="submit" class="primary-button">連絡を送信</button></div></form>`;
       if (type === 'purchase') return `<form id="purchaseForm" class="field-grid"><div class="field full"><label for="purchaseTitle">希望する物品・修理</label><input id="purchaseTitle" required placeholder="例：譜面台の修理"></div><div class="field"><label for="purchaseCategory">種類</label><select id="purchaseCategory"><option>購入希望</option><option>修理希望</option></select></div><div class="field"><label for="purchaseUrgency">希望時期</label><select id="purchaseUrgency"><option>急ぎではない</option><option>なるべく早く</option><option>今週中</option></select></div><div class="field full"><label for="purchaseBody">詳細</label><textarea id="purchaseBody" placeholder="数量、状態、必要な理由など"></textarea></div><div class="field full"><div class="modal-footer"><button type="button" class="secondary-button" data-action="close-modal">キャンセル</button><button type="submit" class="primary-button">希望を送信</button></div></div></form>`;
@@ -677,6 +768,23 @@
       const editing = Boolean(song);
       openModal(editing?'曲を編集':'ライブラリに曲を追加', `<form id="songForm" class="field-grid"><div class="field full"><label for="songTitle">曲名</label><input id="songTitle" required value="${escapeHtml(song?.title||'')}" placeholder="例：宝島"></div><div class="field full"><label for="songByline">作曲・編曲者</label><input id="songByline" required value="${escapeHtml(song?.byline||'')}" placeholder="作曲者 / 編曲者"></div><div class="field full"><label for="songSort">並び替え用の読み（ローマ字）</label><input id="songSort" value="${escapeHtml(song?.sortKey||'')}" placeholder="例：Takarajima"></div><div class="field full"><label for="songDrive">Google Driveの楽譜URL</label><input id="songDrive" type="url" value="${escapeHtml(song?.drive||'')}" placeholder="https://drive.google.com/..."></div><div class="field full"><label for="songYoutube">YouTube参考音源URL</label><input id="songYoutube" type="url" value="${escapeHtml(song?.youtube||'')}" placeholder="https://www.youtube.com/..."></div><div class="field full"><label for="songAudio">音源ファイル ${song?.audioKey?'（新しいファイルを選ぶと差し替え）':''}</label><input id="songAudio" type="file" accept="audio/*,.mp3,.m4a,.wav,.ogg"></div><div class="field full"><div class="modal-footer"><button type="button" class="secondary-button" data-action="close-modal">キャンセル</button><button type="submit" class="primary-button">保存</button></div></div></form>`);
     }
+    function openMemberModal(member) {
+      openModal('部員情報を編集', `<form id="memberForm" data-id="${escapeHtml(member.id)}" class="field-grid"><div class="field full"><label for="memberName">氏名</label><input id="memberName" required value="${escapeHtml(member.name)}"></div><div class="field"><label for="memberGrade">現在の学年</label><select id="memberGrade"><option value="" ${member.grade ? '' : 'selected'}>未設定</option><option value="1" ${member.grade===1?'selected':''}>高校1年</option><option value="2" ${member.grade===2?'selected':''}>高校2年</option><option value="3" ${member.grade===3?'selected':''}>高校3年</option></select></div><div class="field"><label for="memberPart">パート</label><input id="memberPart" value="${escapeHtml(member.part||'')}" placeholder="例：Alto Sax / Piano"></div><div class="field full"><div class="panel-note">学年を変更すると、今日を新しい進級基準日にします。</div><div class="modal-footer"><button type="button" class="secondary-button" data-action="close-modal">キャンセル</button><button type="submit" class="primary-button">変更を保存</button></div></div></form>`);
+    }
+    async function manageMember(payload) {
+      const { data: result, error } = await supabaseClient.functions.invoke('manage-member', { body: payload });
+      if (error) throw error;
+      if (result?.error) throw new Error(result.error);
+      await loadWorkspace(currentSession.user);
+      return result;
+    }
+    async function deleteMember(userId) {
+      const member = data.members.find(item => item.id === userId);
+      if (!member || member.id === data.userId) return;
+      if (!window.confirm(`${member.name}さんを現在の団体から外します。他の団体に所属している場合、その所属とアカウントは維持されます。`)) return;
+      const result = await manageMember({ action: 'delete', targetUserId: member.id });
+      showToast(result.accountDeleted ? `${member.name}さんのアカウントを削除しました` : `${member.name}さんをこの団体から外しました`);
+    }
     function openRequestForm(type) {
       const titles = { absence: '遅刻・欠席連絡', purchase: '購入・修理希望', lost: '落とし物を報告' };
       if (type === 'absence') openAbsence(); else openModal(titles[type], formMarkup(type));
@@ -689,6 +797,12 @@
         supabaseClient.auth.signOut().then(({ error }) => { if(error) showToast('ログアウトに失敗しました'); });
         return;
       }
+      if (target.dataset.action === 'switch-group') {
+        closeModal();
+        activePage = 'home';
+        loadWorkspace(currentSession.user, target.dataset.schoolId).catch(handleWorkspaceError);
+        return;
+      }
       if (target.dataset.page) { activePage=target.dataset.page; render(); closeDrawer(); return; }
       if (target.dataset.form) { openRequestForm(target.dataset.form); closeDrawer(); return; }
       if (target.dataset.action === 'close-modal') { closeModal(); return; }
@@ -699,6 +813,8 @@
       if (target.classList.contains('calendar-day')) { selectedDate=target.dataset.date; renderCalendar(); return; }
       if (target.dataset.action==='request-status') { updateReportStatus(target.dataset.id, target.dataset.status).catch(showDatabaseError); return; }
       if (target.dataset.action==='member-role') { updateMemberRole(target.dataset.index).catch(showDatabaseError); return; }
+      if (target.dataset.action==='edit-member') { const member=data.members[Number(target.dataset.index)]; if(member) openMemberModal(member); return; }
+      if (target.dataset.action==='delete-member') { deleteMember(target.dataset.id).catch(showDatabaseError); return; }
       if (target.dataset.action==='save-theme') { saveTheme().catch(showDatabaseError); return; }
       if (target.dataset.action==='add-song') { openSongModal(); return; }
       if (target.dataset.action==='edit-song') { const song=data.songs.find(item=>item.id===target.dataset.id); if(song) openSongModal(song); return; }
@@ -710,7 +826,7 @@
       }
       if (target.id==='menuButton') { openDrawer(); return; }
       if (target.id==='noticeButton') { openRequestForm('absence'); return; }
-      if (target.id==='clubSwitch') { showToast(`${data.schoolName} · ${data.clubName}`); return; }
+      if (target.id==='clubSwitch') { openGroupSwitcher(); return; }
     }
     function openDrawer() { document.getElementById('sidebar').classList.add('open'); document.getElementById('scrim').classList.add('open'); }
     function closeDrawer() { document.getElementById('sidebar').classList.remove('open'); document.getElementById('scrim').classList.remove('open'); }
@@ -727,8 +843,7 @@
     async function updateMemberRole(index) {
       const member = data.members[Number(index)];
       if (!member) return;
-      checkedData(await supabaseClient.from('profiles').update({ is_admin: !member.role }).eq('id', member.id).eq('school_id', data.schoolId));
-      await loadWorkspace(currentSession.user);
+      await manageMember({ action: 'update', targetUserId: member.id, isAdmin: !member.role });
       showToast(`${member.name}の権限を更新しました`);
     }
     async function saveTheme() {
@@ -786,6 +901,7 @@
               if (!metadata.full_name) throw new Error('氏名を入力してください。');
               const partPrimary = String(values.get('partPrimary') || '').trim();
               const partSecondary = String(values.get('partSecondary') || '').trim();
+              metadata.grade = String(values.get('grade') || '');
               metadata.part = [partPrimary, partSecondary].filter(Boolean).join(' / ');
               metadata.invite_code = String(values.get('inviteCode') || '').trim().toUpperCase();
             } else {
@@ -810,6 +926,21 @@
         return;
       }
       try {
+        if(form.id==='joinGroupForm') {
+          const inviteCode=document.getElementById('joinGroupInviteCode').value.trim().toUpperCase();
+          const { data: result, error } = await supabaseClient.functions.invoke('join-group', { body: { inviteCode } });
+          if (error) throw error;
+          if (!result?.school?.id) throw new Error(result?.error || '団体に参加できませんでした。');
+          closeModal(); activePage='home';
+          await loadWorkspace(currentSession.user, result.school.id);
+          showToast(`${result.school.club_name}に参加しました`);
+          return;
+        }
+        if(form.id==='memberForm') {
+          const gradeValue=document.getElementById('memberGrade').value;
+          await manageMember({action:'update',targetUserId:form.dataset.id,fullName:document.getElementById('memberName').value.trim(),part:document.getElementById('memberPart').value.trim(),grade:gradeValue===''?null:Number(gradeValue)});
+          closeModal(); showToast('部員情報を更新しました'); return;
+        }
         if(form.id==='absenceForm') {
           const date=new FormData(form).get('date');
           const note=document.getElementById('absenceNote').value.trim();

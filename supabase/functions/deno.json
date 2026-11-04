@@ -3,6 +3,9 @@
     "strict": true
   },
   "tasks": {
-    "check:welcome-email": "deno check send-organization-welcome/index.ts"
+    "check:welcome-email": "deno check send-organization-welcome/index.ts",
+    "check:manage-member": "deno check manage-member/index.ts",
+    "check:join-group": "deno check join-group/index.ts"
+    "check:join-group": "deno check join-group/index.ts"
   }
 }

@@ -21,20 +21,27 @@ Resendの送信元ドメイン設定が必要です。チャットやソース�
 
 1. Supabase SQL Editorで最新の `supabase/schema.sql` を実行する
 2. Resendで送信元ドメインを検証する
-3. Supabase CLIを対象プロジェクトにリンクし、Functionをデプロイする
+3. Supabase CLIを対象プロジェクトにリンクし、Edge Functionsをデプロイする
 
 ```sh
 supabase functions deploy send-organization-welcome
+supabase functions deploy manage-member
+supabase functions deploy join-group
 ```
 
 Supabase DashboardのEdge Function Secretsに次の値を登録してください。
+supabase functions deploy join-group
 
-- `RESEND_API_KEY`: Resendで再発行したAPIキー
-- `TUTTI_FROM_EMAIL`: Resendで検証済みの送信元（例: `Tutti <noreply@example.com>`）
+`manage-member` Functionは同じ団体の管理者だけに所属ごとの部員情報編集と除籍を許可します。
+他団体の所属が残る場合はAuthアカウントを維持し、最後の管理者や自分自身の除籍は拒否します。
+`join-group` Functionはログインユーザーの認証と招待コードを検証し、追加の所属を作成します。
 - `TUTTI_APP_URL`: VercelにデプロイしたTuttiのURL
 
 Functionは認証ユーザーが学校作成者かつ管理者であることを確認し、登録メールアドレスへ
 団体名・招待コード・アプリURLを送信します。送信済み時刻を記録して重複送信を防ぎます。
+`manage-member` Functionは同じ団体の管理者だけに所属プロフィールの編集と除籍を許可します。
+他団体の所属が残る場合はAuthアカウントを維持し、最後の所属を外した場合だけアカウントも削除します。
+`join-group` Functionは認証ユーザーのプロフィール情報を使い、招待コードから追加の所属を作成します。
 
 部員はホーム画面に表示される招待コードを使って参加できます。このコードは同じ団体の
 ログイン済みユーザー全員に表示されます。コードを知っている人が参加できる仕様です。
