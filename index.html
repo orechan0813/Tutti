@@ -955,7 +955,7 @@ function renderAdmin() {
       if (target.dataset.action==='member-role') { updateMemberRole(target.dataset.index).catch(showDatabaseError); return; }
       if (target.dataset.action==='edit-member') { const member=data.members[Number(target.dataset.index)]; if(member) openMemberModal(member); return; }
       if (target.dataset.action==='delete-member') { deleteMember(target.dataset.id).catch(showDatabaseError); return; }
-            if (target.dataset.action==='save-theme') { saveTheme().catch(showDatabaseError); return; }
+      if (target.dataset.action==='save-theme') { saveTheme().catch(showDatabaseError); return; }
       
       // ⏱️ メトロノームの上限数を設定する（足りない分を equipment テーブルに自動生成・削除）
       if (target.dataset.action === 'save-metro-max') {
