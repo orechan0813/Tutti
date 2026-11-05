@@ -723,21 +723,109 @@
         return `<section class="member-grade-group"><h3 class="member-grade-title">${grade ? `高校${grade}年` : '学年未設定'}</h3>${partGroups}</section>`;
       }).join('');
     }
-    function renderAdmin() {
-      const pending = data.requests.filter(item => item.status === '確認待ち');
+function renderAdmin() {
+      // 欠席連絡を除外した、確認待ちの件数を計算
+      const activeRequests = data.requests.filter(item => item.type !== '遅刻・欠席連絡');
+      const pendingCount = activeRequests.filter(item => item.status === '確認待ち').length;
+      
       const memberGroups = renderMemberGroups();
       content.innerHTML = `<div class="welcome-row"><div><div class="eyebrow">CLUB MANAGEMENT</div><h1>管理者画面</h1><div class="subheading">${escapeHtml(data.schoolName)} · ${escapeHtml(data.clubName)}の運営を管理します。</div></div></div>
         <div class="grid admin-grid"><div class="stack">
-          <section class="panel"><div class="panel-head"><div><div class="panel-title">連絡フォームの投稿</div><div class="panel-note">確認待ち ${pending.length}件 · 投稿を承認または対応済みにできます</div></div></div><div class="request-list">${data.requests.length?data.requests.map(item => `<div class="request-row"><div><div class="request-title">${escapeHtml(item.title)}</div><div class="request-copy">${escapeHtml(item.body)}</div><div class="request-meta"><span>${escapeHtml(item.type)}</span><span>·</span><span>${escapeHtml(item.name)}</span><span>·</span><span>${escapeHtml(dateLabel(item.date))}</span></div></div><div class="inline-actions"><span class="request-state ${item.status==='対応済み'?'approved':item.status==='却下'?'rejected':''}">${escapeHtml(item.status)}</span>${item.status==='確認待ち'?`<button class="secondary-button" data-action="request-status" data-id="${item.id}" data-status="対応済み">確認</button><button class="danger-button" data-action="request-status" data-id="${item.id}" data-status="却下">却下</button>`:''}</div></div>`).join(''):'<div class="empty-state">新しい投稿はありません。</div>'}</div></section>
+          
+          <!-- 楽器の購入・修理希望パネル -->
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <div class="panel-title">楽器の購入・修理希望</div>
+                <div class="panel-note">確認待ち ${data.requests.filter(item => item.type === '購入・修理希望' && item.status === '確認待ち').length}件</div>
+              </div>
+            </div>
+            <div class="request-list">
+              ${data.requests.filter(item => item.type === '購入・修理希望').length ? 
+                data.requests.filter(item => item.type === '購入・修理希望').map(item => `
+                  <div class="request-row">
+                    <div>
+                      <div class="request-title">${escapeHtml(item.title)}</div>
+                      <div class="request-copy">${escapeHtml(item.body)}</div>
+                      <div class="request-meta">
+                        <span>${escapeHtml(item.name)}</span><span>·</span><span>${escapeHtml(dateLabel(item.date))}</span>
+                      </div>
+                    </div>
+                    <div class="inline-actions">
+                      <span class="request-state ${item.status==='対応済み'?'approved':item.status==='却下'?'rejected':''}">${escapeHtml(item.status)}</span>
+                      ${item.status==='確認待ち'?`
+                        <button class="secondary-button" data-action="request-status" data-id="${item.id}" data-status="対応済み">確認</button>
+                        <button class="danger-button" data-action="request-status" data-id="${item.id}" data-status="却下">却下</button>
+                      `:''}
+                    </div>
+                  </div>
+                `).join('') : '<div class="empty-state">新しい購入・修理希望はありません。</div>'
+              }
+            </div>
+          </section>
+
+          <!-- 落とし物報告パネル -->
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <div class="panel-title">落とし物報告</div>
+                <div class="panel-note">確認待ち ${data.requests.filter(item => item.type === '落とし物報告' && item.status === '確認待ち').length}件</div>
+              </div>
+            </div>
+            <div class="request-list">
+              ${data.requests.filter(item => item.type === '落とし物報告').length ? 
+                data.requests.filter(item => item.type === '落とし物報告').map(item => `
+                  <div class="request-row">
+                    <div>
+                      <div class="request-title">${escapeHtml(item.title)}</div>
+                      <div class="request-copy">${escapeHtml(item.body)}</div>
+                      <div class="request-meta">
+                        <span>${escapeHtml(item.name)}</span><span>·</span><span>${escapeHtml(dateLabel(item.date))}</span>
+                      </div>
+                    </div>
+                    <div class="inline-actions">
+                      <span class="request-state ${item.status==='対応済み'?'approved':item.status==='却下'?'rejected':''}">${escapeHtml(item.status)}</span>
+                      ${item.status==='確認待ち'?`
+                        <button class="secondary-button" data-action="request-status" data-id="${item.id}" data-status="対応済み">確認</button>
+                        <button class="danger-button" data-action="request-status" data-id="${item.id}" data-status="却下">却下</button>
+                      `:''}
+                    </div>
+                  </div>
+                `).join('') : '<div class="empty-state">新しい落とし物報告はありません。</div>'
+              }
+            </div>
+          </section>
+
           <section class="panel"><div class="panel-head"><div><div class="panel-title">部員管理</div><div class="panel-note">学年、パートの順に表示</div></div><span class="panel-note">${data.members.length}名</span></div><div class="panel-body">${memberGroups || '<div class="empty-state">部員はいません。</div>'}</div></section>
           <section class="panel"><div class="panel-head"><div><div class="panel-title">団体のデザイン</div><div class="panel-note">背景色・文字色・フォントをカスタマイズ</div></div></div><div class="panel-body"><div class="theme-preview" id="themePreview"><strong>青葉高校 吹奏楽部</strong><span>この団体のテーマプレビュー</span></div><div class="theme-controls"><label class="color-field">背景色 <input type="color" id="themePage" value="${escapeHtml(data.theme.page)}"></label><label class="color-field">文字色 <input type="color" id="themeInk" value="${escapeHtml(data.theme.ink)}"></label></div><div class="field" style="margin-top:12px"><label for="themeFont">フォント</label><select id="themeFont"><option ${data.theme.font==='DM Sans'?'selected':''}>DM Sans</option><option ${data.theme.font==='Noto Sans JP'?'selected':''}>Noto Sans JP</option></select></div><div style="display:flex;justify-content:flex-end;margin-top:12px"><button class="primary-button" data-action="save-theme">テーマを保存</button></div></div></section>
         </div><div class="stack">
           <section class="panel"><div class="panel-head"><div><div class="panel-title">練習予定を作成</div><div class="panel-note">カレンダーとホームに表示</div></div></div><div class="panel-body"><form id="eventForm" class="field-grid"><div class="field"><label for="eventDate">日付</label><input id="eventDate" type="date" required value="${shiftDay(1)}"></div><div class="field"><label for="eventTime">開始時刻</label><input id="eventTime" type="time" required value="16:00"></div><div class="field full"><label for="eventTitle">練習内容</label><input id="eventTitle" required placeholder="例：合奏練習"></div><div class="field full"><label for="eventPlace">場所</label><input id="eventPlace" required placeholder="例：音楽室"></div><div class="field full"><label for="eventDetail">詳細</label><input id="eventDetail" placeholder="練習内容など"></div><div class="field full"><button class="primary-button" type="submit">予定を追加</button></div></form></div></section>
-          <section class="panel"><div class="panel-head"><div><div class="panel-title">全体連絡を投稿</div><div class="panel-note">ホーム画面に掲載されます</div></div></div><div class="panel-body"><form id="noticeForm" class="field-grid"><div class="field full"><label for="noticeTitle">タイトル</label><input id="noticeTitle" required placeholder="連絡のタイトル"></div><div class="field full"><label for="noticeBody">内容</label><textarea id="noticeBody" required placeholder="部員への連絡事項"></textarea></div><div class="field full"><button class="primary-button" type="submit">連絡を投稿</button></div></form></div></section>
+          <section class="panel"><div class="panel-head"><div><div class="panel-title">全体連絡を投稿</div><div class="panel-note">ホーム画面に掲載されます</div></div></div><div class="panel-body"><form id="noticeForm" class="field-grid">
+  <div class="field full">
+    <label for="noticeTitle">タイトル</label>
+    <input id="noticeTitle" required placeholder="連絡のタイトル">
+  </div>
+  <div class="field full">
+    <label for="noticeBody">内容</label>
+    <textarea id="noticeBody" required placeholder="部員への連絡事項"></textarea>
+  </div>
+  <!-- 📎 追加：ファイル添付の入力欄 -->
+  <div class="field full">
+    <label for="noticeFile">ファイルを添付する (任意)</label>
+    <input id="noticeFile" type="file" style="margin-top: 6px; display: block;">
+  </div>
+  <div class="field full">
+    <button class="primary-button" type="submit">連絡を投稿</button>
+  </div>
+</form>
+
+</div></section>
         </div></div>`;
+
       const previewTitle = content.querySelector('#themePreview strong');
       if (previewTitle) previewTitle.textContent = `${data.schoolName} ${data.clubName}`;
-    }
+}
+
     function showToast(message) {
       const toast = document.getElementById('toast'); toast.textContent = message; toast.classList.add('show');
       clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.classList.remove('show'), 2600);
@@ -990,10 +1078,46 @@
           checkedData(await supabaseClient.from('schedules').insert({school_id:data.schoolId,title:document.getElementById('eventTitle').value.trim(),content:document.getElementById('eventDetail').value.trim(),starts_at:startsAt,location:document.getElementById('eventPlace').value.trim()}));
           await loadWorkspace(currentSession.user); showToast('練習予定を追加しました'); return;
         }
-        if(form.id==='noticeForm') {
-          checkedData(await supabaseClient.from('announcements').insert({school_id:data.schoolId,author_id:currentProfile.id,title:document.getElementById('noticeTitle').value.trim(),body:document.getElementById('noticeBody').value.trim()}));
-          await loadWorkspace(currentSession.user); showToast('全体連絡を投稿しました');
+                if(form.id==='noticeForm') {
+          const fileInput = document.getElementById('noticeFile');
+          const file = fileInput ? fileInput.files[0] : null;
+          let bodyText = document.getElementById('noticeBody').value.trim();
+          const titleText = document.getElementById('noticeTitle').value.trim();
+
+          // ① もしファイルが選択されていたら、Supabase Storageにアップロードする
+          if (file) {
+            // ユニークなファイルパスを作成 (学校ID / 時間 / ファイル名)
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${Date.now()}.${fileExt}`;
+            const path = `${data.schoolId}/${fileName}`;
+
+            // アプリ内に既にある 'song-audio' バケットをファイル置き場として流用
+            const upload = await supabaseClient.storage.from('song-audio').upload(path, file, {
+              contentType: file.type,
+              upsert: true
+            });
+            if (upload.error) throw upload.error;
+
+            // アップロードしたファイルの公開URLを取得
+            const { data: publicUrlData } = supabaseClient.storage.from('song-audio').getPublicUrl(path);
+            
+            // ② 本文の末尾に、部員がダウンロードできるリンクを自動で追記
+            bodyText += `\n\n📎 添付ファイル:\n${publicUrlData.publicUrl}`;
+          }
+
+          // ③ 既存のテーブル構造に合わせて保存する（author_idもバッチリ含めています）
+          checkedData(await supabaseClient.from('announcements').insert({
+            school_id: data.schoolId,
+            author_id: currentProfile.id,
+            title: titleText,
+            body: bodyText
+          }));
+          
+          await loadWorkspace(currentSession.user); 
+          showToast('全体連絡を投稿しました'); 
+          return;
         }
+
       } catch (error) { showDatabaseError(error); }
     });
     document.addEventListener('click', event => { if(event.target.id==='scrim') closeDrawer(); });
