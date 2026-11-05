@@ -819,8 +819,53 @@ function renderAdmin() {
   </div>
 </form>
 
-</div></section>
+          <section class="panel"><div class="panel-head"><div><div class="panel-title">全体連絡を投稿</div><div class="panel-note">ホーム画面に掲載されます</div></div></div><div class="panel-body"><form id="noticeForm" class="field-grid"><div class="field full"><label for="noticeTitle">タイトル</label><input id="noticeTitle" required placeholder="連絡のタイトル"></div><div class="field full"><label for="noticeBody">内容</label><textarea id="noticeBody" required placeholder="部員への連絡事項"></textarea></div><div class="field full"><button class="primary-button" type="submit">連絡を投稿</button></div></form></div></section>
+          
+          <!-- ⏱️ ここにメトロノーム管理パネルが綺麗に入ります -->
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <div class="panel-title">⏱️ メトロノーム貸出管理</div>
+                <div class="panel-note">現在の貸出状況と最大数の管理</div>
+              </div>
+            </div>
+            <div class="panel-body">
+              <div style="display: flex; gap: 12px; align-items: flex-end; margin-bottom: 20px;">
+                <div class="field" style="margin: 0; flex: 1;">
+                  <label for="metroMaxCount">メトロノームの最大所有数</label>
+                  <input id="metroMaxCount" type="number" min="0" value="${data.equipment.filter(e => e.name.startsWith('メトロノーム')).length || 0}" placeholder="例: 5">
+                </div>
+                <button class="primary-button" data-action="save-metro-max" style="white-space: nowrap;">上限数を適用</button>
+              </div>
+
+              <div class="request-list">
+                <div class="panel-note" style="margin-bottom: 8px;">貸出中・申請中の一覧</div>
+                ${data.equipment.filter(e => e.name.startsWith('メトロノーム') && e.borrower_id).length ? 
+                  data.equipment.filter(e => e.name.startsWith('メトロノーム') && e.borrower_id).map(item => {
+                    const borrower = data.members.find(m => m.id === item.borrower_id) || { full_name: '不明な部員' };
+                    return `
+                      <div class="request-row">
+                        <div>
+                          <div class="request-title">${escapeHtml(item.name)}</div>
+                          <div class="request-meta">
+                            <span>借用者: ${escapeHtml(borrower.full_name)}</span>
+                            <span>·</span>
+                            <span>貸出日: ${escapeHtml(dateLabel(item.borrowed_at))}</span>
+                          </div>
+                        </div>
+                        <div class="inline-actions">
+                          <button class="danger-button" data-action="return-metro" data-id="${item.id}">返却処理 (消去)</button>
+                        </div>
+                      </div>
+                    `;
+                  }).join('') : '<div class="empty-state">現在貸出中のメトロノームはありません。</div>'
+                }
+              </div>
+            </div>
+          </section>
+
         </div></div>`;
+
 
       const previewTitle = content.querySelector('#themePreview strong');
       if (previewTitle) previewTitle.textContent = `${data.schoolName} ${data.clubName}`;
@@ -911,6 +956,52 @@ function renderAdmin() {
       if (target.dataset.action==='edit-member') { const member=data.members[Number(target.dataset.index)]; if(member) openMemberModal(member); return; }
       if (target.dataset.action==='delete-member') { deleteMember(target.dataset.id).catch(showDatabaseError); return; }
       if (target.dataset.action==='save-theme') { saveTheme().catch(showDatabaseError); return; }
+            // ⏱️ メトロノームの上限数を設定する（足りない分を equipment テーブルに自動生成・削除）
+      if (target.dataset.action === 'save-metro-max') {
+        (async () => {
+          const maxCount = parseInt(document.getElementById('metroMaxCount').value) || 0;
+          const currentMetros = data.equipment.filter(e => e.name.startsWith('メトロノーム'));
+          
+          if (maxCount < currentMetros.length) {
+            // 減らす場合は、まだ誰も借りていない空きのメトロノームから優先的に削除
+            const toDelete = currentMetros.filter(e => !e.borrower_id).slice(0, currentMetros.length - maxCount);
+            for (const item of toDelete) {
+              const { error } = await supabaseClient.from('equipment').delete().eq('id', item.id);
+              if (error) throw error;
+            }
+          } else if (maxCount > currentMetros.length) {
+            // 増やす場合は、新規メトロノームレコードを不足分追加
+            const needed = maxCount - currentMetros.length;
+            const newRows = Array.from({ length: needed }, (_, i) => ({
+              school_id: data.schoolId,
+              name: `メトロノーム #${currentMetros.length + i + 1}`
+            }));
+            const { error } = await supabaseClient.from('equipment').insert(newRows);
+            if (error) throw error;
+          }
+          
+          await loadWorkspace(currentSession.user);
+          showToast('メトロノームの最大数を更新しました');
+        })().catch(showDatabaseError);
+        return;
+      }
+
+      // ⏱️ 管理者側から「返却」を受け付け、貸出データを空（リセット）にする
+      if (target.dataset.action === 'return-metro') {
+        (async () => {
+          const id = target.dataset.id;
+          const { error } = await supabaseClient.from('equipment').update({
+            borrower_id: null,
+            borrowed_at: null
+          }).eq('id', id);
+          if (error) throw error;
+          
+          await loadWorkspace(currentSession.user);
+          showToast('返却処理が完了しました');
+        })().catch(showDatabaseError);
+        return;
+      }
+
       if (target.dataset.action==='add-song') { openSongModal(); return; }
       if (target.dataset.action==='edit-song') { const song=data.songs.find(item=>item.id===target.dataset.id); if(song) openSongModal(song); return; }
       if (target.dataset.action==='play-song') { playSong(target.dataset.id); return; }
