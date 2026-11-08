@@ -1119,9 +1119,16 @@ function renderAdmin() {
     }
     function openDrawer() { document.getElementById('sidebar').classList.add('open'); document.getElementById('scrim').classList.add('open'); }
     function closeDrawer() { document.getElementById('sidebar').classList.remove('open'); document.getElementById('scrim').classList.remove('open'); }
-    function showDatabaseError(error) {
+    async function showDatabaseError(error) {
       console.error('Supabase operation failed', error);
-      showToast(error?.message || 'Supabaseへの保存に失敗しました');
+      let message = error?.message;
+      try {
+        if (error?.context && typeof error.context.json === 'function') {
+          const body = await error.context.json();
+          if (body?.error) message = body.error;
+        }
+      } catch (readError) { console.warn('Could not read the function error body', readError); }
+      showToast(message || 'Supabaseへの保存に失敗しました');
     }
     async function updateReportStatus(id, uiStatus) {
       const status = uiStatus === '却下' ? 'rejected' : 'resolved';
