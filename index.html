@@ -366,7 +366,7 @@
         { id: 'song-5', title: '銀河鉄道999', byline: 'タケカワ ユキヒデ / 樽屋 雅徳 編曲', sortKey: 'Galaxy Express 999', drive: 'https://drive.google.com/', youtube: 'https://www.youtube.com/results?search_query=Galaxy+Express+999+wind+orchestra' }
       ]
     };
-    const emptyWorkspace = () => ({ isAdmin: false, schoolId: null, schoolName: '', clubName: '', inviteCode: '', userName: '', userId: null, groups: [], theme: { page: '#f3f5ef', ink: '#19332f', font: 'DM Sans' }, events: [], notices: [], absences: [], meters: [], lost: null, requests: [], members: [], songs: [] });
+    const emptyWorkspace = () => ({ isAdmin: false, schoolId: null, schoolName: '', clubName: '', inviteCode: '', userName: '', userId: null, groups: [], theme: { page: '#f3f5ef', ink: '#19332f', font: 'DM Sans' }, events: [], notices: [], absences: [], meters: [], equipment: [], lost: null, requests: [], members: [], songs: [] });
     let data = emptyWorkspace();
     let currentSession = null;
     let currentProfile = null;
@@ -510,7 +510,7 @@
         readRows(supabaseClient.from('songs').select('id, title, sort_reading, composer, arranger, drive_url, youtube_url, audio_file_path').eq('school_id', schoolId), 'songs'),
         readRows(supabaseClient.from('announcements').select('id, title, body, created_at').eq('school_id', schoolId).order('created_at', { ascending: false }), 'announcements'),
         readOptionalRow(supabaseClient.from('club_settings').select('theme_page, theme_ink, theme_font').eq('school_id', schoolId).maybeSingle(), 'club_settings'),
-        readRows(supabaseClient.from('equipment').select('id, name, borrower_id').eq('school_id', schoolId).order('name'), 'equipment')
+        readRows(supabaseClient.from('equipment').select('id, name, borrower_id, borrowed_at').eq('school_id', schoolId).order('name'), 'equipment')
       ]);
       if (sequence !== loadSequence) return;
       const reportsForView = await Promise.all(reports.map(async report => {
@@ -538,6 +538,7 @@
         songs: songRows.map(item => ({ id: item.id, title: item.title, byline: [item.composer, item.arranger && `${item.arranger} 編曲`].filter(Boolean).join(' / '), sortKey: item.sort_reading, drive: item.drive_url, youtube: item.youtube_url, audioKey: item.audio_file_path })),
         notices: announcementRows.map(item => ({ id: item.id, title: item.title, body: item.body, date: japanDateKey(item.created_at), mark: '♪' })),
         theme: settingsData ? { page: settingsData.theme_page, ink: settingsData.theme_ink, font: settingsData.theme_font } : { page: '#f3f5ef', ink: '#19332f', font: 'DM Sans' },
+        equipment: equipmentRows,
         meters: equipmentRows.map(item => ({ id: item.id, name: item.name, status: item.borrower_id ? `貸出中 · ${members.find(member => member.user_id === item.borrower_id)?.full_name || '部員'}` : '貸出できます' })),
         lost: { title: '落とし物の報告はありません', body: '', image: '', date: dayKey(new Date()) }
       };
@@ -737,12 +738,12 @@ function renderAdmin() {
             <div class="panel-head">
               <div>
                 <div class="panel-title">楽器の購入・修理希望</div>
-                <div class="panel-note">確認待ち ${data.requests.filter(item => item.type === '購入・修理希望' && item.status === '確認待ち').length}件</div>
+                <div class="panel-note">確認待ち ${data.requests.filter(item => item.kind === 'purchase_repair' && item.status === '確認待ち').length}件</div>
               </div>
             </div>
             <div class="request-list">
-              ${data.requests.filter(item => item.type === '購入・修理希望').length ? 
-                data.requests.filter(item => item.type === '購入・修理希望').map(item => `
+              ${data.requests.filter(item => item.kind === 'purchase_repair').length ? 
+                data.requests.filter(item => item.kind === 'purchase_repair').map(item => `
                   <div class="request-row">
                     <div>
                       <div class="request-title">${escapeHtml(item.title)}</div>
@@ -769,12 +770,12 @@ function renderAdmin() {
             <div class="panel-head">
               <div>
                 <div class="panel-title">落とし物報告</div>
-                <div class="panel-note">確認待ち ${data.requests.filter(item => item.type === '落とし物報告' && item.status === '確認待ち').length}件</div>
+                <div class="panel-note">確認待ち ${data.requests.filter(item => item.kind === 'lost_found' && item.status === '確認待ち').length}件</div>
               </div>
             </div>
             <div class="request-list">
-              ${data.requests.filter(item => item.type === '落とし物報告').length ? 
-                data.requests.filter(item => item.type === '落とし物報告').map(item => `
+              ${data.requests.filter(item => item.kind === 'lost_found').length ? 
+                data.requests.filter(item => item.kind === 'lost_found').map(item => `
                   <div class="request-row">
                     <div>
                       <div class="request-title">${escapeHtml(item.title)}</div>
@@ -819,7 +820,7 @@ function renderAdmin() {
   </div>
 </form>
 
-          <section class="panel"><div class="panel-head"><div><div class="panel-title">全体連絡を投稿</div><div class="panel-note">ホーム画面に掲載されます</div></div></div><div class="panel-body"><form id="noticeForm" class="field-grid"><div class="field full"><label for="noticeTitle">タイトル</label><input id="noticeTitle" required placeholder="連絡のタイトル"></div><div class="field full"><label for="noticeBody">内容</label><textarea id="noticeBody" required placeholder="部員への連絡事項"></textarea></div><div class="field full"><button class="primary-button" type="submit">連絡を投稿</button></div></form></div></section>
+          </div></section>
           
           <!-- ⏱️ ここにメトロノーム管理パネルが綺麗に入ります -->
           <section class="panel">
@@ -833,24 +834,24 @@ function renderAdmin() {
               <div style="display: flex; gap: 12px; align-items: flex-end; margin-bottom: 20px;">
                 <div class="field" style="margin: 0; flex: 1;">
                   <label for="metroMaxCount">メトロノームの最大所有数</label>
-                  <input id="metroMaxCount" type="number" min="0" value="${data.equipment.filter(e => e.name.startsWith('メトロノーム')).length || 0}" placeholder="例: 5">
+                  <input id="metroMaxCount" type="number" min="0" value="${(data.equipment || []).filter(e => e.name.startsWith('メトロノーム')).length || 0}" placeholder="例: 5">
                 </div>
                 <button class="primary-button" data-action="save-metro-max" style="white-space: nowrap;">上限数を適用</button>
               </div>
 
               <div class="request-list">
                 <div class="panel-note" style="margin-bottom: 8px;">貸出中・申請中の一覧</div>
-                ${data.equipment.filter(e => e.name.startsWith('メトロノーム') && e.borrower_id).length ? 
-                  data.equipment.filter(e => e.name.startsWith('メトロノーム') && e.borrower_id).map(item => {
-                    const borrower = data.members.find(m => m.id === item.borrower_id) || { full_name: '不明な部員' };
+                ${(data.equipment || []).filter(e => e.name.startsWith('メトロノーム') && e.borrower_id).length ? 
+                  (data.equipment || []).filter(e => e.name.startsWith('メトロノーム') && e.borrower_id).map(item => {
+                    const borrower = data.members.find(m => m.id === item.borrower_id) || { name: '不明な部員' };
                     return `
                       <div class="request-row">
                         <div>
                           <div class="request-title">${escapeHtml(item.name)}</div>
                           <div class="request-meta">
-                            <span>借用者: ${escapeHtml(borrower.full_name)}</span>
+                            <span>借用者: ${escapeHtml(borrower.name)}</span>
                             <span>·</span>
-                            <span>貸出日: ${escapeHtml(dateLabel(item.borrowed_at))}</span>
+                            <span>貸出日: ${escapeHtml((item.borrowed_at ? dateLabel(japanDateKey(item.borrowed_at)) : '-'))}</span>
                           </div>
                         </div>
                         <div class="inline-actions">
@@ -912,7 +913,7 @@ function renderAdmin() {
       openModal('部員情報を編集', `<form id="memberForm" data-id="${escapeHtml(member.id)}" class="field-grid"><div class="field full"><label for="memberName">氏名</label><input id="memberName" required value="${escapeHtml(member.name)}"></div><div class="field"><label for="memberGrade">現在の学年</label><select id="memberGrade"><option value="" ${member.grade ? '' : 'selected'}>未設定</option><option value="1" ${member.grade===1?'selected':''}>高校1年</option><option value="2" ${member.grade===2?'selected':''}>高校2年</option><option value="3" ${member.grade===3?'selected':''}>高校3年</option></select></div><div class="field"><label for="memberPart">パート</label><input id="memberPart" value="${escapeHtml(member.part||'')}" placeholder="例：Alto Sax / Piano"></div><div class="field full"><div class="panel-note">学年を変更すると、今日を新しい進級基準日にします。</div><div class="modal-footer"><button type="button" class="secondary-button" data-action="close-modal">キャンセル</button><button type="submit" class="primary-button">変更を保存</button></div></div></form>`);
     }
     async function manageMember(payload) {
-      const { data: result, error } = await supabaseClient.functions.invoke('manage-member', { body: payload });
+      const { data: result, error } = await supabaseClient.functions.invoke('manage-member', { body: { schoolId: data.schoolId, ...payload } });
       if (error) throw error;
       if (result?.error) throw new Error(result.error);
       await loadWorkspace(currentSession.user);
@@ -961,7 +962,7 @@ function renderAdmin() {
       if (target.dataset.action === 'save-metro-max') {
         (async () => {
           const maxCount = parseInt(document.getElementById('metroMaxCount').value) || 0;
-          const currentMetros = data.equipment.filter(e => e.name.startsWith('メトロノーム'));
+          const currentMetros = (data.equipment || []).filter(e => e.name.startsWith('メトロノーム'));
           
           if (maxCount < currentMetros.length) {
             // 減らす場合は、まだ誰も借りていない空きのメトロノームから優先的に削除
@@ -983,22 +984,6 @@ function renderAdmin() {
           
           await loadWorkspace(currentSession.user);
           showToast('メトロノームの最大数を更新しました');
-        })().catch(showDatabaseError);
-        return;
-      }
-
-      // ⏱️ 管理者側から「返却」を受け付け、貸出データを空（リセット）にする
-      if (target.dataset.action === 'return-metro') {
-        (async () => {
-          const id = target.dataset.id;
-          const { error } = await supabaseClient.from('equipment').update({
-            borrower_id: null,
-            borrowed_at: null
-          }).eq('id', id);
-          if (error) throw error;
-          
-          await loadWorkspace(currentSession.user);
-          showToast('返却処理が完了しました');
         })().catch(showDatabaseError);
         return;
       }
