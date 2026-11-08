@@ -46,15 +46,24 @@ Deno.serve(async (request) => {
   const serviceClient = createClient(supabaseUrl, serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
-  const { data: actor, error: actorError } = await serviceClient
+  // A user can belong to several organizations, so the acting organization must be
+  // identified explicitly. Older clients that omit schoolId still work when the
+  // user belongs to exactly one organization.
+  const requestedSchoolId = typeof body.schoolId === "string" ? body.schoolId : "";
+  let actorQuery = serviceClient
     .from("school_memberships")
     .select("school_id, is_admin")
-    .eq("user_id", authData.user.id)
-    .maybeSingle();
+    .eq("user_id", authData.user.id);
+  if (requestedSchoolId) actorQuery = actorQuery.eq("school_id", requestedSchoolId);
+  const { data: actorRows, error: actorError } = await actorQuery;
   if (actorError) {
     console.error("Could not load the acting profile.", actorError);
     return jsonResponse({ error: "Could not verify administrator" }, 500);
   }
+  if (!requestedSchoolId && (actorRows?.length || 0) > 1) {
+    return jsonResponse({ error: "schoolId is required" }, 400);
+  }
+  const actor = actorRows?.[0];
   if (!actor?.is_admin) return jsonResponse({ error: "Administrator permission required" }, 403);
 
   const { data: target, error: targetError } = await serviceClient
