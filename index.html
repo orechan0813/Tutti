@@ -124,6 +124,11 @@
     .meter-info { flex: 1; }
     .meter-name { font-size: 11px; font-weight: 600; }
     .meter-status { font-size: 10px; color: var(--muted); }
+    button.meter-row { width: 100%; background: none; border: 0; border-bottom: 1px solid #edf0ec; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+    button.meter-row:last-child { border-bottom: 0; padding-bottom: 0; }
+    button.meter-row:hover { background: #fafbf8; }
+    button.meter-row.borrowed { cursor: default; }
+    .meter-hint { color: var(--green); }
     .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #67a884; }
     .lost-feature { display: grid; grid-template-columns: 105px 1fr; gap: 13px; align-items: center; }
     .lost-image { width: 105px; height: 85px; object-fit: cover; border-radius: 8px; background: #e7ebe4; }
@@ -510,7 +515,7 @@
         readRows(supabaseClient.from('songs').select('id, title, sort_reading, composer, arranger, drive_url, youtube_url, audio_file_path').eq('school_id', schoolId), 'songs'),
         readRows(supabaseClient.from('announcements').select('id, title, body, created_at').eq('school_id', schoolId).order('created_at', { ascending: false }), 'announcements'),
         readOptionalRow(supabaseClient.from('club_settings').select('theme_page, theme_ink, theme_font').eq('school_id', schoolId).maybeSingle(), 'club_settings'),
-        readRows(supabaseClient.from('equipment').select('id, name, borrower_id, borrowed_at').eq('school_id', schoolId).order('name'), 'equipment')
+        readRows(supabaseClient.from('equipment').select('id, name, borrower_id, borrowed_at, borrower_part').eq('school_id', schoolId).order('name'), 'equipment')
       ]);
       if (sequence !== loadSequence) return;
       const reportsForView = await Promise.all(reports.map(async report => {
@@ -539,7 +544,7 @@
         notices: announcementRows.map(item => ({ id: item.id, title: item.title, body: item.body, date: japanDateKey(item.created_at), mark: '♪' })),
         theme: settingsData ? { page: settingsData.theme_page, ink: settingsData.theme_ink, font: settingsData.theme_font } : { page: '#f3f5ef', ink: '#19332f', font: 'DM Sans' },
         equipment: equipmentRows,
-        meters: equipmentRows.map(item => ({ id: item.id, name: item.name, status: item.borrower_id ? `貸出中 · ${members.find(member => member.user_id === item.borrower_id)?.full_name || '部員'}` : '貸出できます' })),
+        meters: equipmentRows.map(item => ({ id: item.id, name: item.name, borrowed: Boolean(item.borrower_id), part: item.borrower_part || '', status: item.borrower_id ? `貸出中 · ${item.borrower_part || '部員'}` : '貸出できます' })),
         lost: { title: '落とし物の報告はありません', body: '', image: '', date: dayKey(new Date()) }
       };
       const lostReport = reportsForView.find(item => item.kind === 'lost_found' && item.status !== 'rejected');
@@ -656,7 +661,7 @@
       const todayKey = dayKey(new Date());
       const todayEvent = data.events.find(event => event.date === todayKey);
       const todayAbsences = data.absences.filter(item => item.date === todayKey);
-      const available = data.meters.filter(item => item.status.includes('できます')).length;
+      const available = data.meters.filter(item => !item.borrowed).length;
       content.innerHTML = `
         <div class="welcome-row"><div><div class="eyebrow">${escapeHtml(dateLabel(todayKey))}</div><h1>${japanGreeting()}、${escapeHtml(data.userName)}さん</h1><div class="subheading">${escapeHtml(data.schoolName)} · ${escapeHtml(data.clubName)}</div></div><button class="primary-button" data-form="absence">＋　連絡する</button></div>
         <div class="grid stats-grid">
@@ -673,7 +678,7 @@
           </div>
           <div class="stack">
             <section class="panel"><div class="panel-head"><div><div class="panel-title">部員招待コード</div><div class="panel-note">このコードを共有すると部員が参加できます</div></div></div><div class="panel-body"><div class="invite-code">${escapeHtml(data.inviteCode || '未設定')}</div>${data.inviteCode ? '<button class="secondary-button" style="margin-top:10px" data-action="copy-invite-code">コードをコピー</button>' : ''}</div></section>
-            <section class="panel"><div class="panel-head"><div><div class="panel-title">メトロノーム</div><div class="panel-note">貸出状況</div></div><span class="panel-note">${available} / ${data.meters.length}台 空き</span></div><div class="panel-body">${data.meters.map(item => `<div class="meter-row"><div class="meter-icon">♩</div><div class="meter-info"><div class="meter-name">${escapeHtml(item.name)}</div><div class="meter-status">${escapeHtml(item.status)}</div></div><span class="status-dot" style="background:${item.status.includes('できます')?'#67a884':'#e4ad55'}"></span></div>`).join('')}</div></section>
+            <section class="panel"><div class="panel-head"><div><div class="panel-title">メトロノーム</div><div class="panel-note">貸出状況</div></div><span class="panel-note">${available} / ${data.meters.length}台 空き</span></div><div class="panel-body">${data.meters.map(item => `<button type="button" class="meter-row ${item.borrowed ? 'borrowed' : ''}" data-action="borrow-metro" data-id="${escapeHtml(item.id)}"><div class="meter-icon">♩</div><div class="meter-info"><div class="meter-name">${escapeHtml(item.name)}</div><div class="meter-status">${escapeHtml(item.status)}${item.borrowed ? '' : ' <span class="meter-hint">· タップして借りる</span>'}</div></div><span class="status-dot" style="background:${item.borrowed ? '#e4ad55' : '#67a884'}"></span></button>`).join('')}</div></section>
             <section class="panel"><div class="panel-head"><div><div class="panel-title">落とし物のお知らせ</div><div class="panel-note">心当たりはありませんか？</div></div><button class="quiet-button" data-form="lost">報告する</button></div><div class="panel-body"><div class="lost-feature"><img class="lost-image" src="${escapeHtml(data.lost.image)}" alt="${escapeHtml(data.lost.title)}" onerror="this.src='https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=440&q=80'"><div><div class="lost-title">${escapeHtml(data.lost.title)}</div><div class="lost-copy">${escapeHtml(data.lost.body)}</div><div class="lost-date">${escapeHtml(dateLabel(data.lost.date))}</div></div></div></div></section>
             <section class="panel"><div class="panel-head"><div><div class="panel-title">今週の予定</div><div class="panel-note">次の合奏まであと少し</div></div></div><div class="panel-body">${data.events.filter(item => item.date >= todayKey).slice(0,3).map(item => `<div class="detail-row"><div class="detail-time">${escapeHtml(new Date(`${item.date}T12:00:00`).getDate())}日</div><div class="person-info"><div class="person-name">${escapeHtml(item.title)}</div><div class="person-detail">${escapeHtml(item.time)} · ${escapeHtml(item.place)}</div></div></div>`).join('') || '<div class="empty-state">予定はありません。</div>'}</div></section>
           </div>
@@ -849,7 +854,7 @@ function renderAdmin() {
                         <div>
                           <div class="request-title">${escapeHtml(item.name)}</div>
                           <div class="request-meta">
-                            <span>借用者: ${escapeHtml(borrower.name)}</span>
+                            <span>パート: <strong>${escapeHtml(item.borrower_part || '未入力')}</strong></span><span>·</span><span>借用者: ${escapeHtml(borrower.name)}</span>
                             <span>·</span>
                             <span>貸出日: ${escapeHtml((item.borrowed_at ? dateLabel(japanDateKey(item.borrowed_at)) : '-'))}</span>
                           </div>
@@ -881,6 +886,12 @@ function renderAdmin() {
       modalBackdrop.classList.add('open');
     }
     function closeModal() { modalBackdrop.classList.remove('open'); }
+    function openMetroBorrow(meter) {
+      const defaultPart = ((data.groups || []).find(group => group.id === data.schoolId)?.part || '').split(' / ')[0];
+      openModal(`${escapeHtml(meter.name)}を借りる`, `<form id="metroBorrowForm" data-id="${escapeHtml(meter.id)}" data-name="${escapeHtml(meter.name)}" class="field-grid"><div class="field full"><label for="metroPart">借りるパート</label><input id="metroPart" required maxlength="40" autocomplete="off" value="${escapeHtml(defaultPart)}" placeholder="例：トランペット"></div><div class="field full"><button class="primary-button" type="submit">借りる</button></div></form>`);
+      const input = document.getElementById('metroPart');
+      if (input) input.focus();
+    }
     function openGroupSwitcher() {
       const options = (data.groups || []).map(group => `<button type="button" class="group-picker-item ${group.id===data.schoolId?'active':''}" data-action="switch-group" data-school-id="${escapeHtml(group.id)}"><span class="club-avatar">${escapeHtml(initials(group.schoolName))}</span><span><strong>${escapeHtml(group.clubName)}</strong><br><span class="panel-note">${escapeHtml(group.schoolName)} · ${group.isAdmin?'管理者':'部員'}</span></span></button>`).join('');
       openModal('所属グループを選択', `<div class="group-picker">${options || '<div class="empty-state">参加中の団体はありません。</div>'}</div><div class="nav-divider"></div><form id="joinGroupForm" class="field-grid"><div class="field full"><label for="joinGroupInviteCode">別の団体に参加</label><input id="joinGroupInviteCode" name="inviteCode" autocomplete="off" autocapitalize="characters" minlength="12" maxlength="12" pattern="[A-Fa-f0-9]{12}" placeholder="12桁の招待コード" required></div><div class="field full"><button type="submit" class="secondary-button">＋ グループに参加</button></div></form>`);
@@ -942,6 +953,13 @@ function renderAdmin() {
         closeModal();
         activePage = 'home';
         loadWorkspace(currentSession.user, target.dataset.schoolId).catch(handleWorkspaceError);
+        return;
+      }
+      if (target.dataset.action === 'borrow-metro') {
+        const meter = data.meters.find(item => item.id === target.dataset.id);
+        if (!meter) return;
+        if (meter.borrowed) showToast(`${meter.name}は${meter.part || '他の部員'}が借りています`);
+        else openMetroBorrow(meter);
         return;
       }
       if (target.dataset.page) { activePage=target.dataset.page; render(); closeDrawer(); return; }
@@ -1070,6 +1088,18 @@ function renderAdmin() {
     });
     document.addEventListener('submit', async event => {
       event.preventDefault(); const form=event.target;
+      if (form.id === 'metroBorrowForm') {
+        try {
+          const part = document.getElementById('metroPart').value.trim();
+          if (!part) throw new Error('パートを入力してください。');
+          const { error } = await supabaseClient.rpc('borrow_equipment', { p_equipment_id: form.dataset.id, p_part: part });
+          if (error) throw error;
+          closeModal();
+          await loadWorkspace(currentSession.user);
+          showToast(`${form.dataset.name}を借りました`);
+        } catch (error) { showDatabaseError(error); }
+        return;
+      }
       if (form.id === 'authForm') {
         const values = new FormData(form);
         const email = String(values.get('email') || '').trim();
