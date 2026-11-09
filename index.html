@@ -209,6 +209,15 @@
     .modal-title { font-size: 15px; font-weight: 700; }
     .modal-body { padding: 19px 20px 21px; }
     .modal-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+    .history-tabs { display: flex; gap: 8px; margin-bottom: 6px; }
+    .history-tabs button { flex: 1; }
+    .history-date { margin: 16px 0 4px; font-size: 11px; font-weight: 700; color: var(--muted); }
+    .history-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid #edf0ec; }
+    .history-main { min-width: 0; flex: 1; }
+    .history-title { font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+    .history-sub { margin-top: 2px; font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
+    .history-actions { display: flex; gap: 6px; flex-shrink: 0; }
+    .history-actions .secondary-button, .history-actions .danger-button { min-height: 30px; padding: 0 10px; font-size: 11px; }
     .reason-options { display: flex; flex-wrap: wrap; gap: 7px; }
     .reason-option { padding: 7px 10px; border: 1px solid var(--line); border-radius: 7px; background: white; color: #66736c; cursor: pointer; font-size: 11px; }
     .reason-option.selected { border-color: var(--green); background: var(--green-pale); color: var(--green); }
@@ -737,7 +746,7 @@ function renderAdmin() {
       const pendingCount = activeRequests.filter(item => item.status === '確認待ち').length;
       
       const memberGroups = renderMemberGroups();
-      content.innerHTML = `<div class="welcome-row"><div><div class="eyebrow">CLUB MANAGEMENT</div><h1>管理者画面</h1><div class="subheading">${escapeHtml(data.schoolName)} · ${escapeHtml(data.clubName)}の運営を管理します。</div></div></div>
+      content.innerHTML = `<div class="welcome-row"><div><div class="eyebrow">CLUB MANAGEMENT</div><h1>管理者画面</h1><div class="subheading">${escapeHtml(data.schoolName)} · ${escapeHtml(data.clubName)}の運営を管理します。</div></div><button class="secondary-button" type="button" data-action="open-history">履歴</button></div>
         <div class="grid admin-grid"><div class="stack">
           
           <!-- 楽器の購入・修理希望パネル -->
@@ -967,6 +976,96 @@ function renderAdmin() {
       if (error) throw error;
       return result;
     }
+    let historyState = { tab: 'notice', announcements: [], schedules: [], editing: null };
+    const historyDateLabel = key => new Intl.DateTimeFormat('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' }).format(new Date(`${key}T12:00:00`));
+    const clipText = (value, max) => { const chars = Array.from(String(value ?? '').replace(/\s+/g, ' ').trim()); return chars.length > max ? `${chars.slice(0, max - 1).join('')}…` : chars.join(''); };
+    function groupByDate(items, getKey) {
+      const groups = new Map();
+      for (const item of items) {
+        const key = getKey(item);
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(item);
+      }
+      return [...groups.entries()];
+    }
+    function historyRow(kind, item, sub) {
+      const id = escapeHtml(item.id);
+      return `<div class="history-row"><div class="history-main"><div class="history-title">${escapeHtml(item.title)}</div><div class="history-sub">${escapeHtml(sub)}</div></div><div class="history-actions"><button class="secondary-button" type="button" data-action="history-edit" data-kind="${kind}" data-id="${id}">編集</button><button class="danger-button" type="button" data-action="history-delete" data-kind="${kind}" data-id="${id}">削除</button></div></div>`;
+    }
+    function renderHistory() {
+      if (!modalBackdrop.classList.contains('open')) return;
+      const scrollTop = modal.scrollTop;
+      const state = historyState;
+      if (state.editing) {
+        const { kind, id } = state.editing;
+        const item = (kind === 'notice' ? state.announcements : state.schedules).find(row => row.id === id);
+        if (!item) { state.editing = null; renderHistory(); return; }
+        const buttons = '<div class="field full" style="display:flex;gap:8px"><button class="primary-button" type="submit">保存</button><button class="secondary-button" type="button" data-action="history-back">戻る</button></div>';
+        const form = kind === 'notice'
+          ? `<form id="historyEditForm" data-kind="notice" data-id="${escapeHtml(item.id)}" class="field-grid"><div class="field full"><label for="historyTitle">タイトル</label><input id="historyTitle" required maxlength="100" value="${escapeHtml(item.title)}"></div><div class="field full"><label for="historyBody">本文</label><textarea id="historyBody" rows="5">${escapeHtml(item.body)}</textarea></div><div class="field full"><div class="panel-note">編集しても、通知は再送されません。</div></div>${buttons}</form>`
+          : `<form id="historyEditForm" data-kind="schedule" data-id="${escapeHtml(item.id)}" class="field-grid"><div class="field"><label for="historyDate">日付</label><input id="historyDate" type="date" required value="${japanDateKey(item.starts_at)}"></div><div class="field"><label for="historyTime">開始時刻</label><input id="historyTime" type="time" required value="${toJapanTime(item.starts_at)}"></div><div class="field full"><label for="historyTitle">練習内容</label><input id="historyTitle" required value="${escapeHtml(item.title)}"></div><div class="field full"><label for="historyPlace">場所</label><input id="historyPlace" required value="${escapeHtml(item.location)}"></div><div class="field full"><label for="historyDetail">詳細</label><input id="historyDetail" value="${escapeHtml(item.content)}"></div>${buttons}</form>`;
+        openModal(kind === 'notice' ? '全体連絡を編集' : '練習予定を編集', form);
+        return;
+      }
+      const isNotice = state.tab === 'notice';
+      const tabs = `<div class="history-tabs"><button class="${isNotice ? 'primary-button' : 'secondary-button'}" type="button" data-action="history-tab" data-tab="notice">全体連絡</button><button class="${isNotice ? 'secondary-button' : 'primary-button'}" type="button" data-action="history-tab" data-tab="schedule">練習予定</button></div>`;
+      const groups = isNotice
+        ? groupByDate(state.announcements, item => japanDateKey(item.created_at))
+        : groupByDate(state.schedules, item => japanDateKey(item.starts_at));
+      const list = groups.length
+        ? groups.map(([key, items]) => `<div class="history-date">${escapeHtml(historyDateLabel(key))}</div>${items.map(item => isNotice
+            ? historyRow('notice', item, clipText(item.body, 60))
+            : historyRow('schedule', item, `${toJapanTime(item.starts_at)} · ${item.location}`)).join('')}`).join('')
+        : `<div class="empty-state">${isNotice ? '全体連絡' : '練習予定'}の履歴はありません。</div>`;
+      openModal('履歴', `${tabs}${list}`);
+      modal.scrollTop = scrollTop;
+    }
+    async function openHistory() {
+      historyState = { tab: 'notice', announcements: [], schedules: [], editing: null };
+      openModal('履歴', '<div class="empty-state">読み込み中…</div>');
+      const [announcements, schedules] = await Promise.all([
+        supabaseClient.from('announcements').select('id, title, body, created_at').eq('school_id', data.schoolId).order('created_at', { ascending: false }).limit(300),
+        supabaseClient.from('schedules').select('id, title, content, starts_at, location').eq('school_id', data.schoolId).order('starts_at', { ascending: false }).limit(300)
+      ]);
+      historyState.announcements = checkedData(announcements);
+      historyState.schedules = checkedData(schedules);
+      renderHistory();
+    }
+    async function deleteHistoryItem(kind, id) {
+      const isNotice = kind === 'notice';
+      const item = (isNotice ? historyState.announcements : historyState.schedules).find(row => row.id === id);
+      if (!item) return;
+      if (!window.confirm(`「${item.title}」を削除しますか？この操作は取り消せません。`)) return;
+      const deleted = checkedData(await supabaseClient.from(isNotice ? 'announcements' : 'schedules').delete().eq('id', id).eq('school_id', data.schoolId).select('id'));
+      if (!deleted.length) throw new Error('削除できませんでした。すでに削除されているか、権限がありません。');
+      if (isNotice) historyState.announcements = historyState.announcements.filter(row => row.id !== id);
+      else historyState.schedules = historyState.schedules.filter(row => row.id !== id);
+      renderHistory();
+      await loadWorkspace(currentSession.user);
+      showToast(isNotice ? '全体連絡を削除しました' : '練習予定を削除しました');
+    }
+    async function saveHistoryEdit(form) {
+      const { kind, id } = form.dataset;
+      const value = fieldId => document.getElementById(fieldId).value.trim();
+      const title = value('historyTitle');
+      if (!title) throw new Error('タイトルを入力してください。');
+      if (kind === 'notice') {
+        const updated = checkedData(await supabaseClient.from('announcements').update({ title, body: value('historyBody') }).eq('id', id).eq('school_id', data.schoolId).select('id, title, body, created_at'));
+        if (!updated.length) throw new Error('保存できませんでした。すでに削除されているか、権限がありません。');
+        historyState.announcements = historyState.announcements.map(row => row.id === id ? updated[0] : row);
+      } else {
+        const place = value('historyPlace');
+        if (!place) throw new Error('場所を入力してください。');
+        const startsAt = new Date(`${value('historyDate')}T${value('historyTime')}:00+09:00`).toISOString();
+        const updated = checkedData(await supabaseClient.from('schedules').update({ title, location: place, content: value('historyDetail'), starts_at: startsAt }).eq('id', id).eq('school_id', data.schoolId).select('id, title, content, starts_at, location'));
+        if (!updated.length) throw new Error('保存できませんでした。すでに削除されているか、権限がありません。');
+        historyState.schedules = historyState.schedules.map(row => row.id === id ? updated[0] : row).sort((a, b) => new Date(b.starts_at) - new Date(a.starts_at));
+      }
+      historyState.editing = null;
+      renderHistory();
+      await loadWorkspace(currentSession.user);
+      showToast('保存しました');
+    }
     function openMetroBorrow(meter) {
       const defaultPart = ((data.groups || []).find(group => group.id === data.schoolId)?.part || '').split(' / ')[0];
       openModal(`${escapeHtml(meter.name)}を借りる`, `<form id="metroBorrowForm" data-id="${escapeHtml(meter.id)}" data-name="${escapeHtml(meter.name)}" class="field-grid"><div class="field full"><label for="metroPart">借りるパート</label><input id="metroPart" required maxlength="40" autocomplete="off" value="${escapeHtml(defaultPart)}" placeholder="例：トランペット"></div><div class="field full"><button class="primary-button" type="submit">借りる</button></div></form>`);
@@ -1038,6 +1137,11 @@ function renderAdmin() {
       }
       if (target.dataset.action === 'enable-push') { enablePush().catch(showDatabaseError); return; }
       if (target.dataset.action === 'disable-push') { disablePush().catch(showDatabaseError); return; }
+      if (target.dataset.action === 'open-history') { openHistory().catch(showDatabaseError); return; }
+      if (target.dataset.action === 'history-tab') { historyState.tab = target.dataset.tab === 'schedule' ? 'schedule' : 'notice'; renderHistory(); return; }
+      if (target.dataset.action === 'history-edit') { historyState.editing = { kind: target.dataset.kind, id: target.dataset.id }; renderHistory(); return; }
+      if (target.dataset.action === 'history-back') { historyState.editing = null; renderHistory(); return; }
+      if (target.dataset.action === 'history-delete') { deleteHistoryItem(target.dataset.kind, target.dataset.id).catch(showDatabaseError); return; }
       if (target.dataset.action === 'borrow-metro') {
         const meter = data.meters.find(item => item.id === target.dataset.id);
         if (!meter) return;
@@ -1178,6 +1282,10 @@ function renderAdmin() {
     });
     document.addEventListener('submit', async event => {
       event.preventDefault(); const form=event.target;
+      if (form.id === 'historyEditForm') {
+        try { await saveHistoryEdit(form); } catch (error) { showDatabaseError(error); }
+        return;
+      }
       if (form.id === 'metroBorrowForm') {
         try {
           const part = document.getElementById('metroPart').value.trim();
