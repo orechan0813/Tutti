@@ -393,6 +393,7 @@
     let authMessage = '';
     let authMode = 'signin';
     let signupType = 'create';
+    let pendingVerifyEmail = '';
     let activePage = 'home';
     let calendarDate = new Date();
     let selectedDate = dayKey(new Date());
@@ -452,9 +453,12 @@
       const today = japanDateKey(new Date());
       return Math.max(1, Math.min(3, Number(grade) + schoolYear(today) - schoolYear(gradeAsOf)));
     }
-    const gradeLabel = grade => grade ? `高校${grade}年` : '学年未設定';
+    const gradeLabel = grade => grade ? `${grade}年生` : '学年未設定';
     const toJapanTime = value => new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(value));
-    async function loadWorkspace(user, requestedSchoolId = data.schoolId) {
+    const activeSchoolKey = userId => `tutti.activeSchool.${userId}`;
+    const readActiveSchool = userId => { try { return localStorage.getItem(activeSchoolKey(userId)); } catch { return null; } };
+    const saveActiveSchool = (userId, schoolId) => { try { localStorage.setItem(activeSchoolKey(userId), schoolId); } catch {} };
+    async function loadWorkspace(user, requestedSchoolId = data.schoolId || readActiveSchool(user.id)) {
       const sequence = ++loadSequence;
       const profile = checkedData(await supabaseClient.from('profiles').select('id, school_id, full_name, part, grade, grade_as_of, is_admin').eq('id', user.id).maybeSingle());
       if (sequence !== loadSequence) return;
@@ -517,6 +521,7 @@
         || memberships[0];
       if (!activeMembership) throw new Error('参加中の団体が見つかりません。');
       const schoolId = activeMembership.school_id;
+      saveActiveSchool(user.id, schoolId);
       const schoolData = schoolRows.find(item => item.id === schoolId);
       if (!schoolData) throw new Error('所属団体の情報を取得できません。');
       data.schoolId = schoolId;
@@ -613,8 +618,12 @@
       const message = authMessage || (signedIn ? '所属団体のデータを読み込んでいます。' : registering ? signupType === 'create' ? '団体と管理者アカウントを作成します。' : '招待コードを使って既存の団体に参加します。' : 'メールアドレスとパスワードでログインしてください。');
       const registrationOptions = `<fieldset class="field full" style="border:0;padding:0;margin:0"><legend class="field" style="margin-bottom:7px">登録方法</legend><div class="auth-mode-options"><label class="auth-mode-option"><input type="radio" name="registrationMode" value="create" ${signupType === 'create' ? 'checked' : ''} required><span>部活・団体を新しく登録する（管理者アカウント）</span></label><label class="auth-mode-option"><input type="radio" name="registrationMode" value="join" ${signupType === 'join' ? 'checked' : ''} required><span>既存の部活に参加する（一般部員アカウント）</span></label></div></fieldset>`;
       const organizationFields = '<div class="field full"><label for="authSchoolName">学校名</label><input id="authSchoolName" name="schoolName" autocomplete="organization" placeholder="例：青葉高校" required></div><div class="field full"><label for="authClubName">部活・団体名</label><input id="authClubName" name="clubName" placeholder="例：吹奏楽部" required></div>';
-      const memberFields = '<div class="field"><label for="authGrade">現在の学年</label><select id="authGrade" name="grade" required><option value="">学年を選択</option><option value="1">高校1年</option><option value="2">高校2年</option><option value="3">高校3年</option></select></div><div class="field"><label for="authPartPrimary">メインパート</label><input id="authPartPrimary" name="partPrimary" autocomplete="off" placeholder="例：Alto Sax" required></div><div class="field"><label for="authPartSecondary">サブパート（任意）</label><input id="authPartSecondary" name="partSecondary" autocomplete="off" placeholder="例：Piano"></div><div class="field full"><label for="authInviteCode">招待コード</label><input id="authInviteCode" name="inviteCode" autocomplete="off" autocapitalize="characters" minlength="12" maxlength="12" pattern="[A-Fa-f0-9]{12}" placeholder="12桁のコード" required></div><div class="field full"><label for="authFullName">氏名</label><input id="authFullName" name="fullName" autocomplete="name" required></div>';
+      const memberFields = '<div class="field"><label for="authGrade">現在の学年</label><select id="authGrade" name="grade" required><option value="">学年を選択</option><option value="1">1年生</option><option value="2">2年生</option><option value="3">3年生</option></select></div><div class="field"><label for="authPartPrimary">メインパート</label><input id="authPartPrimary" name="partPrimary" autocomplete="off" placeholder="例：Alto Sax" required></div><div class="field"><label for="authPartSecondary">サブパート（任意）</label><input id="authPartSecondary" name="partSecondary" autocomplete="off" placeholder="例：Piano"></div><div class="field full"><label for="authInviteCode">招待コード</label><input id="authInviteCode" name="inviteCode" autocomplete="off" autocapitalize="characters" minlength="12" maxlength="12" pattern="[A-Fa-f0-9]{12}" placeholder="12桁のコード" required></div><div class="field full"><label for="authFullName">氏名</label><input id="authFullName" name="fullName" autocomplete="name" required></div>';
       const signupFields = registering ? `${registrationOptions}${signupType === 'create' ? organizationFields : memberFields}` : '';
+      if (!signedIn && pendingVerifyEmail) {
+        document.getElementById('authGate').innerHTML = `<section class="auth-panel"><div class="brand" style="padding:0"><div class="brand-mark">T</div><div><div class="brand-name">tutti</div><div class="brand-caption">部活の毎日を、ひとつに。</div></div></div><h1>メールアドレスの確認</h1><p class="auth-message">${escapeHtml(pendingVerifyEmail)} に確認コード（6桁）を送信しました。メールに書かれたコードを入力してください。宛先が違う場合は「やり直す」から入力し直してください。</p><form id="verifyForm" class="field-grid"><div class="field full"><label for="verifyCode">確認コード</label><input id="verifyCode" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" placeholder="6桁の数字" required></div><div class="field full"><button class="primary-button" type="submit">確認して登録を完了</button></div></form><button class="secondary-button" style="width:100%;margin-top:9px" data-auth-action="resend-code">コードを再送する</button><button class="secondary-button" style="width:100%;margin-top:9px" data-auth-action="cancel-verify">やり直す</button><div class="auth-error" id="authError"></div></section>`;
+        return;
+      }
       const signedInActions = '<button class="secondary-button" data-auth-action="sign-out">ログアウト</button>';
       const authForm = `<form id="authForm" class="field-grid">${signupFields}<div class="field full"><label for="authEmail">メールアドレス</label><input id="authEmail" name="email" type="email" autocomplete="email" required></div><div class="field full"><label for="authPassword">パスワード</label><input id="authPassword" name="password" type="password" autocomplete="${registering ? 'new-password' : 'current-password'}" minlength="6" required></div><div class="field full"><button class="primary-button" type="submit">${registering ? '登録する' : 'ログイン'}</button></div></form><button class="secondary-button" style="width:100%;margin-top:9px" data-auth-action="toggle-mode">${registering ? 'ログイン画面に戻る' : '新規部員登録'}</button>`;
       document.getElementById('authGate').innerHTML = `<section class="auth-panel"><div class="brand" style="padding:0"><div class="brand-mark">T</div><div><div class="brand-name">tutti</div><div class="brand-caption">部活の毎日を、ひとつに。</div></div></div><h1>${title}</h1><p class="auth-message">${escapeHtml(message)}</p>${signedIn ? signedInActions : authForm}<div class="auth-error" id="authError"></div></section>`;
@@ -740,7 +749,7 @@
             return `<div class="member-row"><div class="mini-avatar">${escapeHtml(initials(member.name))}</div><div class="person-info"><div class="person-name">${escapeHtml(member.name)}</div><div class="person-detail">${escapeHtml(member.part || 'パート未設定')}</div></div><div class="member-actions"><button class="switch ${member.role?'on':''}" data-action="member-role" data-index="${index}" aria-label="${escapeHtml(member.name)}の管理者権限"></button><span class="member-role">${member.role?'幹部':'部員'}</span><button class="secondary-button" data-action="edit-member" data-index="${index}">編集</button><button class="danger-button" data-action="delete-member" data-id="${escapeHtml(member.id)}" ${member.id===data.userId?'disabled':''}>団体から外す</button></div></div>`;
           }).join('')}</section>`;
         }).join('');
-        return `<section class="member-grade-group"><h3 class="member-grade-title">${grade ? `高校${grade}年` : '学年未設定'}</h3>${partGroups}</section>`;
+        return `<section class="member-grade-group"><h3 class="member-grade-title">${gradeLabel(grade)}</h3>${partGroups}</section>`;
       }).join('');
     }
 function renderAdmin() {
@@ -1152,7 +1161,7 @@ function renderAdmin() {
       openModal(editing?'曲を編集':'ライブラリに曲を追加', `<form id="songForm" class="field-grid"><div class="field full"><label for="songTitle">曲名</label><input id="songTitle" required value="${escapeHtml(song?.title||'')}" placeholder="例：宝島"></div><div class="field full"><label for="songByline">作曲・編曲者</label><input id="songByline" required value="${escapeHtml(song?.byline||'')}" placeholder="作曲者 / 編曲者"></div><div class="field full"><label for="songSort">並び替え用の読み（ローマ字）</label><input id="songSort" value="${escapeHtml(song?.sortKey||'')}" placeholder="例：Takarajima"></div><div class="field full"><label for="songDrive">Google Driveの楽譜URL</label><input id="songDrive" type="url" value="${escapeHtml(song?.drive||'')}" placeholder="https://drive.google.com/..."></div><div class="field full"><label for="songYoutube">YouTube参考音源URL</label><input id="songYoutube" type="url" value="${escapeHtml(song?.youtube||'')}" placeholder="https://www.youtube.com/..."></div><div class="field full"><label for="songAudio">音源ファイル ${song?.audioKey?'（新しいファイルを選ぶと差し替え）':''}</label><input id="songAudio" type="file" accept="audio/*,.mp3,.m4a,.wav,.ogg"></div><div class="field full"><div class="modal-footer"><button type="button" class="secondary-button" data-action="close-modal">キャンセル</button><button type="submit" class="primary-button">保存</button></div></div></form>`);
     }
     function openMemberModal(member) {
-      openModal('部員情報を編集', `<form id="memberForm" data-id="${escapeHtml(member.id)}" class="field-grid"><div class="field full"><label for="memberName">氏名</label><input id="memberName" required value="${escapeHtml(member.name)}"></div><div class="field"><label for="memberGrade">現在の学年</label><select id="memberGrade"><option value="" ${member.grade ? '' : 'selected'}>未設定</option><option value="1" ${member.grade===1?'selected':''}>高校1年</option><option value="2" ${member.grade===2?'selected':''}>高校2年</option><option value="3" ${member.grade===3?'selected':''}>高校3年</option></select></div><div class="field"><label for="memberPart">パート</label><input id="memberPart" value="${escapeHtml(member.part||'')}" placeholder="例：Alto Sax / Piano"></div><div class="field full"><div class="panel-note">学年を変更すると、今日を新しい進級基準日にします。</div><div class="modal-footer"><button type="button" class="secondary-button" data-action="close-modal">キャンセル</button><button type="submit" class="primary-button">変更を保存</button></div></div></form>`);
+      openModal('部員情報を編集', `<form id="memberForm" data-id="${escapeHtml(member.id)}" class="field-grid"><div class="field full"><label for="memberName">氏名</label><input id="memberName" required value="${escapeHtml(member.name)}"></div><div class="field"><label for="memberGrade">現在の学年</label><select id="memberGrade"><option value="" ${member.grade ? '' : 'selected'}>未設定</option><option value="1" ${member.grade===1?'selected':''}>1年生</option><option value="2" ${member.grade===2?'selected':''}>2年生</option><option value="3" ${member.grade===3?'selected':''}>3年生</option></select></div><div class="field"><label for="memberPart">パート</label><input id="memberPart" value="${escapeHtml(member.part||'')}" placeholder="例：Alto Sax / Piano"></div><div class="field full"><div class="panel-note">学年を変更すると、今日を新しい進級基準日にします。</div><div class="modal-footer"><button type="button" class="secondary-button" data-action="close-modal">キャンセル</button><button type="submit" class="primary-button">変更を保存</button></div></div></form>`);
     }
     async function manageMember(payload) {
       const { data: result, error } = await supabaseClient.functions.invoke('manage-member', { body: { schoolId: data.schoolId, ...payload } });
@@ -1175,6 +1184,12 @@ function renderAdmin() {
     function handleClick(event) {
       const target = event.target.closest('button, a, .calendar-day');
       if (!target) return;
+      if (target.dataset.authAction === 'cancel-verify') { pendingVerifyEmail = ''; authMode = 'signup'; authMessage = ''; renderAuthGate(); return; }
+      if (target.dataset.authAction === 'resend-code') {
+        supabaseClient.auth.resend({ type: 'signup', email: pendingVerifyEmail })
+          .then(({ error }) => showToast(error ? '再送に失敗しました。しばらくしてからお試しください。' : '確認コードを再送しました'));
+        return;
+      }
       if (target.dataset.authAction === 'toggle-mode') { authMode=authMode==='signin'?'signup':'signin'; authMessage=''; renderAuthGate(); return; }
       if (target.dataset.authAction === 'sign-out' || target.id === 'signOutButton') {
         withTimeout(pushSupported() ? disablePush({ quiet: true }).catch(() => {}) : Promise.resolve(), 2500).then(() => supabaseClient.auth.signOut()).then(({ error }) => { if(error) showToast('ログアウトに失敗しました'); });
@@ -1349,6 +1364,20 @@ function renderAdmin() {
         } catch (error) { showDatabaseError(error); }
         return;
       }
+      if (form.id === 'verifyForm') {
+        const authError = document.getElementById('authError');
+        if (authError) authError.textContent = '';
+        try {
+          const token = String(new FormData(form).get('code') || '').trim();
+          const { data: verified, error } = await supabaseClient.auth.verifyOtp({ email: pendingVerifyEmail, token, type: 'signup' });
+          if (error) throw error;
+          pendingVerifyEmail = '';
+          await applySession(verified.session);
+        } catch (error) {
+          if (authError) authError.textContent = 'コードが正しくないか、有効期限が切れています。';
+        }
+        return;
+      }
       if (form.id === 'authForm') {
         const values = new FormData(form);
         const email = String(values.get('email') || '').trim();
@@ -1378,8 +1407,8 @@ function renderAdmin() {
             if (error) throw error;
             if (signUpData.session) await applySession(signUpData.session);
             else {
-              authMode = 'signin';
-              authMessage = '登録を受け付けました。確認メールのリンクを開いてからログインしてください。';
+              pendingVerifyEmail = email;
+              authMessage = '';
               renderAuthGate();
             }
           } else {
