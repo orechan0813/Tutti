@@ -209,6 +209,9 @@
     .modal-title { font-size: 15px; font-weight: 700; }
     .modal-body { padding: 19px 20px 21px; }
     .modal-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+    .history-launch { display: flex; align-items: center; gap: 12px; width: 100%; padding: 11px 16px; border: 1px solid; border-radius: 10px; font-size: 13px; font-weight: 700; text-align: left; cursor: pointer; }
+    .history-launch:hover { filter: brightness(.97); }
+    .history-launch .history-launch-note { flex: 1; font-size: 11px; font-weight: 500; opacity: .85; }
     .history-tabs { display: flex; gap: 8px; margin-bottom: 6px; }
     .history-tabs button { flex: 1; }
     .history-date { margin: 16px 0 4px; font-size: 11px; font-weight: 700; color: var(--muted); }
@@ -673,7 +676,7 @@
       const todayAbsences = data.absences.filter(item => item.date === todayKey);
       const available = data.meters.filter(item => !item.borrowed).length;
       content.innerHTML = `
-        <div class="welcome-row"><div><div class="eyebrow">${escapeHtml(dateLabel(todayKey))}</div><h1>${japanGreeting()}、${escapeHtml(data.userName)}さん</h1><div class="subheading">${escapeHtml(data.schoolName)} · ${escapeHtml(data.clubName)}</div></div><button class="primary-button" data-form="absence">＋　連絡する</button></div>
+        <div class="welcome-row"><div><div class="eyebrow">${escapeHtml(dateLabel(todayKey))}</div><h1>${japanGreeting()}、${escapeHtml(data.userName)}さん</h1><div class="subheading">${escapeHtml(data.schoolName)} · ${escapeHtml(data.clubName)}</div></div><button class="primary-button" data-form="absence">＋　連絡</button></div>
         <div class="grid stats-grid">
           <div class="stat-card"><div class="stat-top">今日の部員 <span class="stat-symbol">♧</span></div><div class="stat-number">${Math.max(data.members.length-todayAbsences.length,0)}<span style="font-size:13px;font-weight:500"> / ${data.members.length}</span></div><div class="stat-foot">出席予定</div></div>
           <div class="stat-card"><div class="stat-top">今日の欠席・遅刻 <span class="stat-symbol" style="background:#fff0e9;color:#b56a4c">◷</span></div><div class="stat-number">${todayAbsences.length}<span style="font-size:13px;font-weight:500"> 名</span></div><div class="stat-foot">事前連絡を含む</div></div>
@@ -746,7 +749,7 @@ function renderAdmin() {
       const pendingCount = activeRequests.filter(item => item.status === '確認待ち').length;
       
       const memberGroups = renderMemberGroups();
-      content.innerHTML = `<div class="welcome-row"><div><div class="eyebrow">CLUB MANAGEMENT</div><h1>管理者画面</h1><div class="subheading">${escapeHtml(data.schoolName)} · ${escapeHtml(data.clubName)}の運営を管理します。</div></div><button class="secondary-button" type="button" data-action="open-history">履歴</button></div>
+      content.innerHTML = `<div class="welcome-row"><div><div class="eyebrow">CLUB MANAGEMENT</div><h1>管理者画面</h1><div class="subheading">${escapeHtml(data.schoolName)} · ${escapeHtml(data.clubName)}の運営を管理します。</div></div></div>
         <div class="grid admin-grid"><div class="stack">
           
           <!-- 楽器の購入・修理希望パネル -->
@@ -816,6 +819,7 @@ function renderAdmin() {
           <section class="panel"><div class="panel-head"><div><div class="panel-title">部員管理</div><div class="panel-note">学年、パートの順に表示</div></div><span class="panel-note">${data.members.length}名</span></div><div class="panel-body">${memberGroups || '<div class="empty-state">部員はいません。</div>'}</div></section>
           <section class="panel"><div class="panel-head"><div><div class="panel-title">団体のデザイン</div><div class="panel-note">背景色・文字色・フォントをカスタマイズ</div></div></div><div class="panel-body"><div class="theme-preview" id="themePreview"><strong>青葉高校 吹奏楽部</strong><span>この団体のテーマプレビュー</span></div><div class="theme-controls"><label class="color-field">背景色 <input type="color" id="themePage" value="${escapeHtml(data.theme.page)}"></label><label class="color-field">文字色 <input type="color" id="themeInk" value="${escapeHtml(data.theme.ink)}"></label></div><div class="field" style="margin-top:12px"><label for="themeFont">フォント</label><select id="themeFont"><option ${data.theme.font==='DM Sans'?'selected':''}>DM Sans</option><option ${data.theme.font==='Noto Sans JP'?'selected':''}>Noto Sans JP</option></select></div><div style="display:flex;justify-content:flex-end;margin-top:12px"><button class="primary-button" data-action="save-theme">テーマを保存</button></div></div></section>
         </div><div class="stack">
+          ${renderHistoryLauncher()}
           <section class="panel"><div class="panel-head"><div><div class="panel-title">練習予定を作成</div><div class="panel-note">カレンダーとホームに表示</div></div></div><div class="panel-body"><form id="eventForm" class="field-grid"><div class="field"><label for="eventDate">日付</label><input id="eventDate" type="date" required value="${shiftDay(1)}"></div><div class="field"><label for="eventTime">開始時刻</label><input id="eventTime" type="time" required value="16:00"></div><div class="field full"><label for="eventTitle">練習内容</label><input id="eventTitle" required placeholder="例：合奏練習"></div><div class="field full"><label for="eventPlace">場所</label><input id="eventPlace" required placeholder="例：音楽室"></div><div class="field full"><label for="eventDetail">詳細</label><input id="eventDetail" placeholder="練習内容など"></div><div class="field full"><button class="primary-button" type="submit">予定を追加</button></div></form></div></section>
           <section class="panel"><div class="panel-head"><div><div class="panel-title">全体連絡を投稿</div><div class="panel-note">ホーム画面に掲載されます</div></div></div><div class="panel-body"><form id="noticeForm" class="field-grid">
   <div class="field full">
@@ -975,6 +979,53 @@ function renderAdmin() {
       const { data: result, error } = await supabaseClient.functions.invoke('send-announcement-push', { body: { announcementId } });
       if (error) throw error;
       return result;
+    }
+    // 履歴ボタンの色: 背景色の明度を下げる。ただし背景がもともと暗い(明度がしきい値より低い)ときは、逆に上げる。
+    const HISTORY_LIGHTNESS_THRESHOLD = 0.35;
+    const HISTORY_LIGHTNESS_STEP = 0.18;
+    function hexToHsl(hex) {
+      const r = parseInt(hex.slice(1, 3), 16) / 255, g = parseInt(hex.slice(3, 5), 16) / 255, b = parseInt(hex.slice(5, 7), 16) / 255;
+      const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min, l = (max + min) / 2;
+      let h = 0, s = 0;
+      if (d) {
+        s = d / (1 - Math.abs(2 * l - 1));
+        if (max === r) h = ((g - b) / d) % 6; else if (max === g) h = (b - r) / d + 2; else h = (r - g) / d + 4;
+        h = (h * 60 + 360) % 360;
+      }
+      return [h, s, l];
+    }
+    function hslToHex(h, s, l) {
+      const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = l - c / 2;
+      const [r, g, b] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+      return '#' + [r, g, b].map(v => Math.round((v + m) * 255).toString(16).padStart(2, '0')).join('');
+    }
+    function hexLuminance(hex) {
+      const channel = i => { const v = parseInt(hex.slice(i, i + 2), 16) / 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+      return 0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5);
+    }
+    const hexContrast = (a, b) => { const [hi, lo] = [hexLuminance(a), hexLuminance(b)].sort((x, y) => y - x); return (hi + 0.05) / (lo + 0.05); };
+    function historyButtonColors() {
+      const page = /^#[0-9a-f]{6}$/i.test(data.theme?.page || '') ? data.theme.page : '#f3f5ef';
+      const [h, s, l] = hexToHsl(page);
+      const darken = l >= HISTORY_LIGHTNESS_THRESHOLD;
+      const clamp = value => Math.min(1, Math.max(0, value));
+      let lightness = clamp(l + (darken ? -HISTORY_LIGHTNESS_STEP : HISTORY_LIGHTNESS_STEP));
+      let bg = hslToHex(h, s, lightness);
+      let text = '#ffffff';
+      // 文字が読みにくい中間色になったときは、読める(コントラスト比4.5以上)まで、背景から離れる方向へ明度を少しずつ補正する
+      for (let i = 0; i < 60; i++) {
+        const white = hexContrast(bg, '#ffffff'), dark = hexContrast(bg, '#14201c');
+        text = white >= dark ? '#ffffff' : '#14201c';
+        if (Math.max(white, dark) >= 4.5) break;
+        lightness = clamp(lightness + (darken ? -0.01 : 0.01));
+        bg = hslToHex(h, s, lightness);
+      }
+      const border = hslToHex(h, s, clamp(lightness + (darken ? -0.08 : 0.08)));
+      return { bg, border, text };
+    }
+    function renderHistoryLauncher() {
+      const { bg, border, text } = historyButtonColors();
+      return `<button class="history-launch" type="button" data-action="open-history" style="background:${bg};border-color:${border};color:${text}"><span>履歴</span><span class="history-launch-note">全体連絡・練習予定の確認／編集／削除</span><span aria-hidden="true">›</span></button>`;
     }
     let historyState = { tab: 'notice', announcements: [], schedules: [], editing: null };
     const historyDateLabel = key => new Intl.DateTimeFormat('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' }).format(new Date(`${key}T12:00:00`));
