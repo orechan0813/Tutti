@@ -678,7 +678,7 @@
       document.getElementById('authGate').hidden = true;
       setActiveNav(activePage);
       document.getElementById('topDate').textContent = new Intl.DateTimeFormat('ja-JP', { year:'numeric', month:'long', day:'numeric', weekday:'short' }).format(new Date());
-      document.getElementById('adminNav').innerHTML = data.isAdmin ? '<div class="nav-divider"></div><div class="nav-label">運営</div><button class="nav-item" data-page="admin"><span class="nav-icon">⚙</span>管理者画面<span class="nav-badge">'+data.requests.filter(item => item.status === '確認待ち').length+'</span></button>' : '';
+      document.getElementById('adminNav').innerHTML = data.isAdmin ? '<div class="nav-divider"></div><div class="nav-label">運営</div><button class="nav-item" data-page="admin"><span class="nav-icon">⚙</span>管理者画面<span class="nav-badge">'+data.requests.filter(item => item.kind !== 'absence' && item.status === '確認待ち').length+'</span></button>' : '';
       document.getElementById('clubName').textContent = data.clubName;
       document.getElementById('schoolName').textContent = data.schoolName;
       document.getElementById('clubStorageName').innerHTML = `${escapeHtml(data.schoolName)} ${escapeHtml(data.clubName)}<br>部員の情報をひとつに管理`;
@@ -705,7 +705,7 @@
           <div class="stat-card"><div class="stat-top">今日の部員 <span class="stat-symbol">♧</span></div><div class="stat-number">${Math.max(data.members.length-todayAbsences.length,0)}<span style="font-size:13px;font-weight:500"> / ${data.members.length}</span></div><div class="stat-foot">出席予定</div></div>
           <div class="stat-card"><div class="stat-top">今日の欠席・遅刻 <span class="stat-symbol" style="background:#fff0e9;color:#b56a4c">◷</span></div><div class="stat-number">${todayAbsences.length}<span style="font-size:13px;font-weight:500"> 名</span></div><div class="stat-foot">事前連絡を含む</div></div>
           <div class="stat-card"><div class="stat-top">貸出中の備品 <span class="stat-symbol" style="background:#fff5da;color:#9a782c">♩</span></div><div class="stat-number">${loanedCount}<span style="font-size:13px;font-weight:500"> 点</span></div><div class="stat-foot">${data.equipmentItems.length}種類の備品</div></div>
-          <div class="stat-card"><div class="stat-top">未確認の連絡 <span class="stat-symbol" style="background:#fcece8;color:#b75f4c">✉</span></div><div class="stat-number">${data.requests.filter(item => item.status === '確認待ち').length}<span style="font-size:13px;font-weight:500"> 件</span></div><div class="stat-foot">運営チームが確認します</div></div>
+          <div class="stat-card"><div class="stat-top">未確認の連絡 <span class="stat-symbol" style="background:#fcece8;color:#b75f4c">✉</span></div><div class="stat-number">${data.requests.filter(item => item.kind !== 'absence' && item.status === '確認待ち').length}<span style="font-size:13px;font-weight:500"> 件</span></div><div class="stat-foot">運営チームが確認します</div></div>
         </div>
         <div class="grid home-grid">
           <div class="stack">
@@ -768,7 +768,7 @@
     }
 function renderAdmin() {
       // 欠席連絡を除外した、確認待ちの件数を計算
-      const activeRequests = data.requests.filter(item => item.type !== '遅刻・欠席連絡');
+      const activeRequests = data.requests.filter(item => item.kind !== 'absence');
       const pendingCount = activeRequests.filter(item => item.status === '確認待ち').length;
       
       const memberGroups = renderMemberGroups();
