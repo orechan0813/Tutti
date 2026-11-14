@@ -225,20 +225,18 @@
     .reason-option { padding: 7px 10px; border: 1px solid var(--line); border-radius: 7px; background: white; color: #66736c; cursor: pointer; font-size: 11px; }
     .reason-option.selected { border-color: var(--green); background: var(--green-pale); color: var(--green); }
     [hidden] { display: none !important; }
-    .clock-area { display: grid; justify-items: center; gap: 8px; margin: 10px 0; }
-    .clock-step { font-size: 12px; font-weight: 700; color: var(--green); }
-    .clock-dial { width: 250px; height: 250px; position: relative; border: 1px solid #dfe7df; border-radius: 50%; background: #f7faf7; }
-    .clock-dial.hour-mode { background: #fff3d6; border-color: #ecd9a6; }
-    .clock-inner { position: absolute; top: 50%; left: 50%; width: 164px; height: 164px; margin: -82px; border-radius: 50%; background: #e3eaf6; border: 1px solid #c8d4ea; }
+    .clock-area { display: grid; justify-items: center; gap: 12px; margin: 10px 0; }
+    .clock-readout { display: flex; align-items: baseline; justify-content: center; gap: 2px; min-width: 190px; padding: 10px 20px; border-radius: 16px; background: var(--page); color: var(--ink); border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent); }
+    .clock-ampm { min-width: 30px; margin-right: 8px; font-size: 12px; font-weight: 700; opacity: .7; }
+    .clock-part { padding: 0 8px; border: 0; border-radius: 10px; background: transparent; color: inherit; font: inherit; font-size: 32px; font-weight: 700; line-height: 1.25; cursor: pointer; opacity: .4; }
+    .clock-part.active { opacity: 1; background: color-mix(in srgb, var(--ink) 12%, transparent); }
+    .clock-colon { font-size: 32px; font-weight: 700; opacity: .5; }
+    .clock-dial { width: 250px; height: 250px; position: relative; border: 1px solid var(--line); border-radius: 50%; background: #f4f7f4; }
+    .clock-inner { position: absolute; top: 50%; left: 50%; width: 164px; height: 164px; margin: -82px; border-radius: 50%; background: #fff; border: 1px solid var(--line); }
     .clock-center { position: absolute; top: 50%; left: 50%; width: 9px; height: 9px; border-radius: 50%; background: var(--green); transform: translate(-50%,-50%); }
     .clock-hand { position: absolute; left: 50%; bottom: 50%; width: 2px; margin-left: -1px; background: var(--green); transform-origin: 50% 100%; }
     .clock-number { position: absolute; width: 28px; height: 28px; margin: -14px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: #496258; cursor: pointer; font-size: 12px; }
     .clock-number.selected { color: white; background: var(--green); }
-    .clock-legend { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
-    .clock-legend span { padding: 3px 9px; border-radius: 99px; font-size: 10px; }
-    .clock-legend .am { background: #fff3d6; color: #8a6a1c; }
-    .clock-legend .pm { background: #e3eaf6; color: #3d5686; }
-    .clock-hint { color: var(--muted); text-align: center; font-size: 11px; }
     .equip-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
     .equip-bar { height: 7px; border-radius: 99px; background: #e6ebe6; overflow: hidden; margin: 4px 0 12px; }
     .equip-bar > span { display: block; height: 100%; background: #e4ad55; }
@@ -395,7 +393,7 @@
         { id: 'song-5', title: '銀河鉄道999', byline: 'タケカワ ユキヒデ / 樽屋 雅徳 編曲', sortKey: 'Galaxy Express 999', drive: 'https://drive.google.com/', youtube: 'https://www.youtube.com/results?search_query=Galaxy+Express+999+wind+orchestra' }
       ]
     };
-    const emptyWorkspace = () => ({ isAdmin: false, schoolId: null, schoolName: '', clubName: '', inviteCode: '', userName: '', userId: null, groups: [], theme: { page: '#f3f5ef', ink: '#19332f', font: 'DM Sans' }, events: [], notices: [], absences: [], equipmentItems: [], equipmentLoans: [], lost: null, requests: [], members: [], songs: [] });
+    const emptyWorkspace = () => ({ isAdmin: false, isOwner: false, plan: 'free', schoolId: null, schoolName: '', clubName: '', inviteCode: '', userName: '', userId: null, groups: [], theme: { page: '#f3f5ef', ink: '#19332f', font: 'DM Sans' }, events: [], notices: [], absences: [], equipmentItems: [], equipmentLoans: [], lost: null, requests: [], members: [], songs: [] });
     let data = emptyWorkspace();
     let currentSession = null;
     let currentProfile = null;
@@ -411,9 +409,12 @@
     let selectedDate = dayKey(new Date());
     let selectedReason = '体調不良';
     let absenceKind = '欠席';
-    let arrivalHour = null;
-    let arrivalMinute = null;
-    let clockStep = 'hour';
+    const clocks = {
+      arrival: { hour: null, minute: null, step: 'hour', area: 'clockArea' },
+      event: { hour: 16, minute: 0, step: 'hour', area: 'eventClockArea' },
+      history: { hour: null, minute: null, step: 'hour', area: 'historyClockArea' }
+    };
+    const clockValue = key => `${String(clocks[key].hour).padStart(2, '0')}:${String(clocks[key].minute).padStart(2, '0')}`;
     let toastTimer;
     let deferredInstallPrompt = null;
     const content = document.getElementById('content');
@@ -538,6 +539,17 @@
       const schoolData = schoolRows.find(item => item.id === schoolId);
       if (!schoolData) throw new Error('所属団体の情報を取得できません。');
       data.schoolId = schoolId;
+      // 組織アカウント（この団体を作成した管理者）かどうか。SQL未実行でもアプリが止まらないよう、失敗したら false。
+      let isOwner = false;
+      let plan = 'free';
+      try {
+        const ownerCheck = await supabaseClient.rpc('is_school_owner', { p_school_id: schoolId });
+        isOwner = !ownerCheck.error && ownerCheck.data === true;
+        if (isOwner) {
+          const planRow = await readOptionalRow(supabaseClient.from('school_plans').select('plan').eq('school_id', schoolId).maybeSingle(), 'school_plans');
+          plan = planRow?.plan || 'free';
+        }
+      } catch (error) { isOwner = false; }
       const [members, scheduleRows, reports, songRows, announcementRows, settingsData, equipmentItemRows, equipmentLoanRows] = await Promise.all([
         readRows(supabaseClient.from('school_memberships').select('user_id, school_id, full_name, part, grade, grade_as_of, is_admin').eq('school_id', schoolId).order('full_name'), 'school_memberships'),
         readRows(supabaseClient.from('schedules').select('id, title, content, starts_at, ends_at, location').eq('school_id', schoolId).order('starts_at'), 'schedules'),
@@ -567,6 +579,8 @@
         userName: activeMembership.full_name,
         userId: profile.id,
         isAdmin: activeMembership.is_admin,
+        isOwner,
+        plan,
         members: members.map(member => ({ id: member.user_id, name: member.full_name, part: formatPart(member.part), grade: currentGrade(member.grade, member.grade_as_of), role: member.is_admin })),
         events: scheduleRows.map(item => ({ id: item.id, date: japanDateKey(item.starts_at), time: toJapanTime(item.starts_at), title: item.title, place: item.location, detail: item.content })),
         requests: reportsForView.map(item => ({ id: item.id, dbStatus: item.status, type: reportKindLabel(item.kind), kind: item.kind, title: item.title, body: [item.reason, item.arrival_at ? `到着予定 ${item.arrival_at.slice(0,5)}` : ''].filter(Boolean).join(' · '), name: members.find(member => member.user_id === item.reporter_id)?.full_name || '部員', date: item.report_date, status: reportStatusLabel(item.status), photoPath: item.photo_url, photoUrl: item.photoUrl })),
@@ -771,6 +785,8 @@ function renderAdmin() {
       const activeRequests = data.requests.filter(item => item.kind !== 'absence');
       const pendingCount = activeRequests.filter(item => item.status === '確認待ち').length;
       
+      const planNames = { free: '無料プラン' };
+      const ownerPanel = data.isOwner ? `<section class="panel"><div class="panel-head"><div><div class="panel-title">組織アカウント</div><div class="panel-note">この団体を作成したアカウントにだけ表示されます</div></div></div><div class="panel-body"><div class="person-name">現在のプラン：${escapeHtml(planNames[data.plan] || data.plan)}</div><div class="panel-note" style="margin-top:6px">有料プランのお申し込みやお支払いの管理は、今後このアカウントから行えるようになります。</div></div></section>` : '';
       const memberGroups = renderMemberGroups();
       content.innerHTML = `<div class="welcome-row"><div><div class="eyebrow">CLUB MANAGEMENT</div><h1>管理者画面</h1><div class="subheading">${escapeHtml(data.schoolName)} · ${escapeHtml(data.clubName)}の運営を管理します。</div></div></div>
         <div class="grid admin-grid"><div class="stack">
@@ -843,7 +859,7 @@ function renderAdmin() {
           <section class="panel"><div class="panel-head"><div><div class="panel-title">団体のデザイン</div><div class="panel-note">背景色・文字色・フォントをカスタマイズ</div></div></div><div class="panel-body"><div class="theme-preview" id="themePreview"><strong>青葉高校 吹奏楽部</strong><span>この団体のテーマプレビュー</span></div><div class="theme-controls"><label class="color-field">背景色 <input type="color" id="themePage" value="${escapeHtml(data.theme.page)}"></label><label class="color-field">文字色 <input type="color" id="themeInk" value="${escapeHtml(data.theme.ink)}"></label></div><div class="field" style="margin-top:12px"><label for="themeFont">フォント</label><select id="themeFont"><option ${data.theme.font==='DM Sans'?'selected':''}>DM Sans</option><option ${data.theme.font==='Noto Sans JP'?'selected':''}>Noto Sans JP</option></select></div><div style="display:flex;justify-content:flex-end;margin-top:12px"><button class="primary-button" data-action="save-theme">テーマを保存</button></div></div></section>
         </div><div class="stack">
           ${renderHistoryLauncher()}
-          <section class="panel"><div class="panel-head"><div><div class="panel-title">練習予定を作成</div><div class="panel-note">カレンダーとホームに表示</div></div></div><div class="panel-body"><form id="eventForm" class="field-grid"><div class="field"><label for="eventDate">日付</label><input id="eventDate" type="date" required value="${shiftDay(1)}"></div><div class="field"><label for="eventTime">開始時刻</label><input id="eventTime" type="time" required value="16:00"></div><div class="field full"><label for="eventTitle">練習内容</label><input id="eventTitle" required placeholder="例：合奏練習"></div><div class="field full"><label for="eventPlace">場所</label><input id="eventPlace" required placeholder="例：音楽室"></div><div class="field full"><label for="eventDetail">詳細</label><input id="eventDetail" placeholder="練習内容など"></div><div class="field full"><button class="primary-button" type="submit">予定を追加</button></div></form></div></section>
+          <section class="panel"><div class="panel-head"><div><div class="panel-title">練習予定を作成</div><div class="panel-note">カレンダーとホームに表示</div></div></div><div class="panel-body"><form id="eventForm" class="field-grid"><div class="field full"><label for="eventDate">日付</label><input id="eventDate" type="date" required value="${shiftDay(1)}"></div><div class="field full"><label>開始時刻</label><div class="clock-area" id="eventClockArea"></div></div><div class="field full"><label for="eventTitle">練習内容</label><input id="eventTitle" required placeholder="例：合奏練習"></div><div class="field full"><label for="eventPlace">場所</label><input id="eventPlace" required placeholder="例：音楽室"></div><div class="field full"><label for="eventDetail">詳細</label><input id="eventDetail" placeholder="練習内容など"></div><div class="field full"><button class="primary-button" type="submit">予定を追加</button></div></form></div></section>
           <section class="panel"><div class="panel-head"><div><div class="panel-title">全体連絡を投稿</div><div class="panel-note">ホーム画面に掲載されます</div></div></div><div class="panel-body"><form id="noticeForm" class="field-grid">
   <div class="field full">
     <label for="noticeTitle">タイトル</label>
@@ -864,13 +880,13 @@ function renderAdmin() {
 </form>
 
           </div></section>
-          
-
+          ${ownerPanel}
         </div></div>`;
 
 
       const previewTitle = content.querySelector('#themePreview strong');
       if (previewTitle) previewTitle.textContent = `${data.schoolName} ${data.clubName}`;
+      renderClock('event');
 }
 
     function showToast(message) {
@@ -1035,8 +1051,9 @@ function renderAdmin() {
         const buttons = '<div class="field full" style="display:flex;gap:8px"><button class="primary-button" type="submit">保存</button><button class="secondary-button" type="button" data-action="history-back">戻る</button></div>';
         const form = kind === 'notice'
           ? `<form id="historyEditForm" data-kind="notice" data-id="${escapeHtml(item.id)}" class="field-grid"><div class="field full"><label for="historyTitle">タイトル</label><input id="historyTitle" required maxlength="100" value="${escapeHtml(item.title)}"></div><div class="field full"><label for="historyBody">本文</label><textarea id="historyBody" rows="5">${escapeHtml(item.body)}</textarea></div><div class="field full"><div class="panel-note">編集しても、通知は再送されません。</div></div>${buttons}</form>`
-          : `<form id="historyEditForm" data-kind="schedule" data-id="${escapeHtml(item.id)}" class="field-grid"><div class="field"><label for="historyDate">日付</label><input id="historyDate" type="date" required value="${japanDateKey(item.starts_at)}"></div><div class="field"><label for="historyTime">開始時刻</label><input id="historyTime" type="time" required value="${toJapanTime(item.starts_at)}"></div><div class="field full"><label for="historyTitle">練習内容</label><input id="historyTitle" required value="${escapeHtml(item.title)}"></div><div class="field full"><label for="historyPlace">場所</label><input id="historyPlace" required value="${escapeHtml(item.location)}"></div><div class="field full"><label for="historyDetail">詳細</label><input id="historyDetail" value="${escapeHtml(item.content)}"></div>${buttons}</form>`;
+          : `<form id="historyEditForm" data-kind="schedule" data-id="${escapeHtml(item.id)}" class="field-grid"><div class="field full"><label for="historyDate">日付</label><input id="historyDate" type="date" required value="${japanDateKey(item.starts_at)}"></div><div class="field full"><label>開始時刻</label><div class="clock-area" id="historyClockArea"></div></div><div class="field full"><label for="historyTitle">練習内容</label><input id="historyTitle" required value="${escapeHtml(item.title)}"></div><div class="field full"><label for="historyPlace">場所</label><input id="historyPlace" required value="${escapeHtml(item.location)}"></div><div class="field full"><label for="historyDetail">詳細</label><input id="historyDetail" value="${escapeHtml(item.content)}"></div>${buttons}</form>`;
         openModal(kind === 'notice' ? '全体連絡を編集' : '練習予定を編集', form);
+        if (kind === 'schedule') renderClock('history');
         return;
       }
       const isNotice = state.tab === 'notice';
@@ -1088,7 +1105,8 @@ function renderAdmin() {
       } else {
         const place = value('historyPlace');
         if (!place) throw new Error('場所を入力してください。');
-        const startsAt = new Date(`${value('historyDate')}T${value('historyTime')}:00+09:00`).toISOString();
+        if (clocks.history.hour === null || clocks.history.minute === null) throw new Error('開始時刻（時と分）を選んでください。');
+        const startsAt = new Date(`${value('historyDate')}T${clockValue('history')}:00+09:00`).toISOString();
         const updated = checkedData(await supabaseClient.from('schedules').update({ title, location: place, content: value('historyDetail'), starts_at: startsAt }).eq('id', id).eq('school_id', data.schoolId).select('id, title, content, starts_at, location'));
         if (!updated.length) throw new Error('保存できませんでした。すでに削除されているか、権限がありません。');
         historyState.schedules = historyState.schedules.map(row => row.id === id ? updated[0] : row).sort((a, b) => new Date(b.starts_at) - new Date(a.starts_at));
@@ -1129,46 +1147,38 @@ function renderAdmin() {
       if (type === 'purchase') return `<form id="purchaseForm" class="field-grid"><div class="field full"><label for="purchaseTitle">希望する物品・修理</label><input id="purchaseTitle" required placeholder="例：譜面台の修理"></div><div class="field"><label for="purchaseCategory">種類</label><select id="purchaseCategory"><option>購入希望</option><option>修理希望</option></select></div><div class="field"><label for="purchaseUrgency">希望時期</label><select id="purchaseUrgency"><option>急ぎではない</option><option>なるべく早く</option><option>今週中</option></select></div><div class="field full"><label for="purchaseBody">詳細</label><textarea id="purchaseBody" placeholder="数量、状態、必要な理由など"></textarea></div><div class="field full"><div class="modal-footer"><button type="button" class="secondary-button" data-action="close-modal">キャンセル</button><button type="submit" class="primary-button">希望を送信</button></div></div></form>`;
       return `<form id="lostForm" class="field-grid"><div class="field full"><label for="lostTitle">落とし物・拾得物</label><input id="lostTitle" required placeholder="例：黒い譜面ファイル"></div><div class="field full"><label for="lostPlace">場所・状況</label><textarea id="lostPlace" placeholder="見つけた場所、特徴など"></textarea></div><div class="field full"><label for="lostPhoto">写真を添付</label><input id="lostPhoto" type="file" accept="image/*"><img id="lostPreview" alt="写真プレビュー" style="display:none;max-width:100%;max-height:180px;object-fit:contain;border-radius:8px"></div><div class="field full"><div class="modal-footer"><button type="button" class="secondary-button" data-action="close-modal">キャンセル</button><button type="submit" class="primary-button">報告を送信</button></div></div></form>`;
     }
-    function clockLabel(hour, minute) {
-      if (hour === null) return '時刻を選んでください';
-      const h12 = hour === 0 ? 0 : (hour % 12 || 12);
-      const base = `${hour < 12 ? '午前' : '午後'}${h12}時`;
-      if (minute === null) return `${base}（分を選んでください）`;
-      const mm = String(minute).padStart(2, '0');
-      return `${base}${mm}分（${String(hour).padStart(2, '0')}:${mm}）頃に到着予定`;
-    }
-    function renderClock() {
-      const area = document.getElementById('clockArea');
+    function renderClock(key) {
+      const clock = clocks[key];
+      const area = clock && document.getElementById(clock.area);
       if (!area) return;
       const C = 125;
       const place = (label, radius, degree, attr, selected) => {
         const rad = (degree - 90) * Math.PI / 180;
-        return `<button type="button" class="clock-number ${selected ? 'selected' : ''}" ${attr} style="left:${(C + Math.cos(rad) * radius).toFixed(1)}px;top:${(C + Math.sin(rad) * radius).toFixed(1)}px">${label}</button>`;
+        return `<button type="button" class="clock-number ${selected ? 'selected' : ''}" data-clock="${key}" ${attr} style="left:${(C + Math.cos(rad) * radius).toFixed(1)}px;top:${(C + Math.sin(rad) * radius).toFixed(1)}px">${label}</button>`;
       };
       const numbers = [];
       let handAngle = null, handLength = 0;
-      if (clockStep === 'hour') {
-        for (let n = 1; n <= 12; n++) numbers.push(place(n, 102, (n % 12) * 30, `data-clock-hour="${n}"`, arrivalHour === n));
-        for (let n = 13; n <= 24; n++) numbers.push(place(n, 64, (n % 12) * 30, `data-clock-hour="${n % 24}"`, arrivalHour === n % 24));
-        if (arrivalHour !== null) { handAngle = (arrivalHour % 12) * 30; handLength = arrivalHour >= 1 && arrivalHour <= 12 ? 102 : 64; }
+      if (clock.step === 'hour') {
+        for (let n = 1; n <= 12; n++) numbers.push(place(n, 102, (n % 12) * 30, `data-clock-hour="${n}"`, clock.hour === n));
+        for (let n = 13; n <= 24; n++) numbers.push(place(n, 64, (n % 12) * 30, `data-clock-hour="${n % 24}"`, clock.hour === n % 24));
+        if (clock.hour !== null) { handAngle = (clock.hour % 12) * 30; handLength = clock.hour >= 1 && clock.hour <= 12 ? 102 : 64; }
       } else {
-        for (let m = 0; m < 60; m += 5) numbers.push(place(String(m).padStart(2, '0'), 100, m * 6, `data-clock-minute="${m}"`, arrivalMinute === m));
-        if (arrivalMinute !== null) { handAngle = arrivalMinute * 6; handLength = 100; }
+        for (let m = 0; m < 60; m += 5) numbers.push(place(String(m).padStart(2, '0'), 100, m * 6, `data-clock-minute="${m}"`, clock.minute === m));
+        if (clock.minute !== null) { handAngle = clock.minute * 6; handLength = 100; }
       }
       const hand = handAngle === null ? '' : `<div class="clock-hand" style="height:${handLength}px;transform:rotate(${handAngle}deg)"></div>`;
-      area.innerHTML = ''
-        + `<div class="clock-dial ${clockStep === 'hour' ? 'hour-mode' : ''}">${clockStep === 'hour' ? '<div class="clock-inner"></div>' : ''}${hand}<div class="clock-center"></div>${numbers.join('')}</div>`
-        + (clockStep === 'hour'
-          ? ''
-          : '<button type="button" class="quiet-button" data-clock-action="back">← 時を選び直す</button>')
-        + `<div class="clock-hint">${arrivalHour === null ? '&nbsp;' : escapeHtml(clockLabel(arrivalHour, arrivalMinute))}</div>`;
+      const hourText = clock.hour === null ? '--' : String(clock.hour).padStart(2, '0');
+      const minuteText = clock.minute === null ? '--' : String(clock.minute).padStart(2, '0');
+      const ampm = clock.hour === null ? '' : (clock.hour < 12 ? '午前' : '午後');
+      area.innerHTML = `<div class="clock-readout"><span class="clock-ampm">${ampm}</span><button type="button" class="clock-part ${clock.step === 'hour' ? 'active' : ''}" data-clock="${key}" data-clock-step="hour">${hourText}</button><span class="clock-colon">:</span><button type="button" class="clock-part ${clock.step === 'minute' ? 'active' : ''}" data-clock="${key}" data-clock-step="minute">${minuteText}</button></div>`
+        + `<div class="clock-dial">${clock.step === 'hour' ? '<div class="clock-inner"></div>' : ''}${hand}<div class="clock-center"></div>${numbers.join('')}</div>`;
     }
     function openAbsence() {
       selectedReason = '体調不良';
       absenceKind = '欠席';
-      arrivalHour = null; arrivalMinute = null; clockStep = 'hour';
+      Object.assign(clocks.arrival, { hour: null, minute: null, step: 'hour' });
       openModal('遅刻・欠席連絡', formMarkup('absence'));
-      renderClock();
+      renderClock('arrival');
       document.getElementById('arrivalField').hidden = absenceKind !== '遅刻';
     }
     function openSongModal(song = null) {
@@ -1220,7 +1230,13 @@ function renderAdmin() {
       if (target.dataset.action === 'disable-push') { disablePush().catch(showDatabaseError); return; }
       if (target.dataset.action === 'open-history') { openHistory().catch(showDatabaseError); return; }
       if (target.dataset.action === 'history-tab') { historyState.tab = target.dataset.tab === 'schedule' ? 'schedule' : 'notice'; renderHistory(); return; }
-      if (target.dataset.action === 'history-edit') { historyState.editing = { kind: target.dataset.kind, id: target.dataset.id }; renderHistory(); return; }
+      if (target.dataset.action === 'history-edit') {
+        historyState.editing = { kind: target.dataset.kind, id: target.dataset.id };
+        const editingRow = target.dataset.kind === 'schedule' ? historyState.schedules.find(row => row.id === target.dataset.id) : null;
+        if (editingRow) { const [h, m] = toJapanTime(editingRow.starts_at).split(':').map(Number); Object.assign(clocks.history, { hour: h, minute: m, step: 'hour' }); }
+        renderHistory();
+        return;
+      }
       if (target.dataset.action === 'history-back') { historyState.editing = null; renderHistory(); return; }
       if (target.dataset.action === 'history-delete') { deleteHistoryItem(target.dataset.kind, target.dataset.id).catch(showDatabaseError); return; }
       if (target.dataset.action === 'equip-add') { openEquipmentItemModal(); return; }
@@ -1251,9 +1267,15 @@ function renderAdmin() {
       if (target.dataset.action === 'close-modal') { closeModal(); return; }
       if (target.dataset.kind) { absenceKind=target.dataset.kind; document.querySelectorAll('.kind-option').forEach(item=>item.classList.toggle('selected',item.dataset.kind===absenceKind)); document.getElementById('arrivalField').hidden=absenceKind!=='遅刻'; return; }
       if (target.dataset.reason) { selectedReason=target.dataset.reason; document.querySelectorAll('#reasonOptions .reason-option').forEach(item=>item.classList.toggle('selected',item.dataset.reason===selectedReason)); const arrival = document.getElementById('arrivalField'); if(arrival) arrival.hidden=absenceKind!=='遅刻'; return; }
-      if (target.dataset.clockHour !== undefined) { arrivalHour = Number(target.dataset.clockHour); arrivalMinute = null; clockStep = 'minute'; renderClock(); return; }
-      if (target.dataset.clockMinute !== undefined) { arrivalMinute = Number(target.dataset.clockMinute); renderClock(); return; }
-      if (target.dataset.clockAction === 'back') { clockStep = 'hour'; renderClock(); return; }
+      if (target.dataset.clock && clocks[target.dataset.clock]) {
+        const clockKey = target.dataset.clock;
+        const clock = clocks[clockKey];
+        if (target.dataset.clockHour !== undefined) { clock.hour = Number(target.dataset.clockHour); clock.step = 'minute'; }
+        else if (target.dataset.clockMinute !== undefined) clock.minute = Number(target.dataset.clockMinute);
+        else if (target.dataset.clockStep) clock.step = target.dataset.clockStep;
+        renderClock(clockKey);
+        return;
+      }
       if (target.dataset.month) { if(target.dataset.month==='today') calendarDate=new Date(); else calendarDate.setMonth(calendarDate.getMonth()+Number(target.dataset.month)); renderCalendar(); return; }
       if (target.classList.contains('calendar-day')) { selectedDate=target.dataset.date; renderCalendar(); return; }
       if (target.dataset.action==='request-status') { updateReportStatus(target.dataset.id, target.dataset.status).catch(showDatabaseError); return; }
@@ -1445,8 +1467,8 @@ function renderAdmin() {
         if(form.id==='absenceForm') {
           const date=new FormData(form).get('date');
           const note=document.getElementById('absenceNote').value.trim();
-          if(absenceKind==='遅刻' && (arrivalHour===null || arrivalMinute===null)) { showToast('到着予定の時刻（時と分）を選んでください'); return; }
-          const arrivalAt=absenceKind==='遅刻'?`${String(arrivalHour).padStart(2,'0')}:${String(arrivalMinute).padStart(2,'0')}:00`:null;
+          if(absenceKind==='遅刻' && (clocks.arrival.hour===null || clocks.arrival.minute===null)) { showToast('到着予定の時刻（時と分）を選んでください'); return; }
+          const arrivalAt=absenceKind==='遅刻'?`${clockValue('arrival')}:00`:null;
           const title=absenceKind==='遅刻'?'練習に遅刻します':'練習を欠席します';
           const reason=`${selectedReason}${note?` · ${note}`:''}`;
           await requestEntry('absence',title,reason,date,arrivalAt);
@@ -1480,7 +1502,8 @@ function renderAdmin() {
           closeModal(); await loadWorkspace(currentSession.user); showToast('ライブラリを更新しました'); return;
         }
         if(form.id==='eventForm') {
-          const startsAt=new Date(`${document.getElementById('eventDate').value}T${document.getElementById('eventTime').value}:00+09:00`).toISOString();
+          if (clocks.event.hour === null || clocks.event.minute === null) throw new Error('開始時刻（時と分）を選んでください。');
+          const startsAt=new Date(`${document.getElementById('eventDate').value}T${clockValue('event')}:00+09:00`).toISOString();
           checkedData(await supabaseClient.from('schedules').insert({school_id:data.schoolId,title:document.getElementById('eventTitle').value.trim(),content:document.getElementById('eventDetail').value.trim(),starts_at:startsAt,location:document.getElementById('eventPlace').value.trim()}));
           await loadWorkspace(currentSession.user); showToast('練習予定を追加しました'); return;
         }
