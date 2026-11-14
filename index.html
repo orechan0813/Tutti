@@ -237,6 +237,26 @@
     .clock-hand { position: absolute; left: 50%; bottom: 50%; width: 2px; margin-left: -1px; background: var(--green); transform-origin: 50% 100%; }
     .clock-number { position: absolute; width: 28px; height: 28px; margin: -14px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: #496258; cursor: pointer; font-size: 12px; }
     .clock-number.selected { color: white; background: var(--green); }
+    .time-chip { display: inline-flex; align-items: baseline; gap: 6px; min-height: 36px; padding: 0 11px; border: 1px solid var(--line); border-radius: 9px; background: #fff; color: var(--ink); font: inherit; font-size: 12px; cursor: pointer; }
+    .time-chip span { font-size: 10px; color: var(--muted); }
+    .time-chip strong { font-weight: 700; font-variant-numeric: tabular-nums; }
+    .time-chip.empty strong { font-weight: 500; color: var(--muted); }
+    .time-chip.active { border-color: var(--green); box-shadow: 0 0 0 2px var(--green-pale); }
+    .sched-times { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+    .menu-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 9px 0; border-top: 1px solid #edf0ec; }
+    .menu-row .menu-title { flex: 1 1 170px; min-width: 0; }
+    .sched-picker { margin: 8px 0 4px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: #fbfcfb; }
+    .sched-picker-actions { display: flex; justify-content: space-between; gap: 8px; }
+    .practice-card:after { pointer-events: none; }
+    .practice-card + .practice-card { margin-top: 12px; }
+    .practice-detail { position: relative; margin-top: 12px; color: #d8e8e0; font-size: 12px; line-height: 1.6; white-space: pre-wrap; }
+    .timetable { position: relative; display: grid; gap: 8px; margin-top: 14px; }
+    .menu-card { display: flex; align-items: baseline; gap: 12px; padding: 10px 13px; border-radius: 10px; background: rgba(255,255,255,.12); }
+    .menu-card-time { min-width: 92px; color: #b8d5c9; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .menu-card-title { font-size: 12px; }
+    .practice-close { position: absolute; top: 12px; right: 14px; z-index: 1; padding: 4px 11px; border: 1px solid rgba(255,255,255,.35); border-radius: 8px; background: transparent; color: #fff; font-size: 11px; cursor: pointer; }
+    .event-toggle { width: 100%; border: 0; border-bottom: 1px solid #edf0ec; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+    .event-toggle .person-info { flex: 1; }
     .equip-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
     .equip-bar { height: 7px; border-radius: 99px; background: #e6ebe6; overflow: hidden; margin: 4px 0 12px; }
     .equip-bar > span { display: block; height: 100%; background: #e4ad55; }
@@ -411,9 +431,12 @@
     let absenceKind = '欠席';
     const clocks = {
       arrival: { hour: null, minute: null, step: 'hour', area: 'clockArea' },
-      event: { hour: 16, minute: 0, step: 'hour', area: 'eventClockArea' },
-      history: { hour: null, minute: null, step: 'hour', area: 'historyClockArea' }
+      pickCreate: { hour: null, minute: null, step: 'hour', area: 'pick-create' },
+      pickEdit: { hour: null, minute: null, step: 'hour', area: 'pick-edit' }
     };
+    function freshScheduleDraft() { return { start: '16:00', end: null, items: [], picker: null }; }
+    const scheduleDrafts = { create: freshScheduleDraft(), edit: freshScheduleDraft() };
+    let expandedEventId = null;
     const clockValue = key => `${String(clocks[key].hour).padStart(2, '0')}:${String(clocks[key].minute).padStart(2, '0')}`;
     let toastTimer;
     let deferredInstallPrompt = null;
@@ -550,15 +573,16 @@
           plan = planRow?.plan || 'free';
         }
       } catch (error) { isOwner = false; }
-      const [members, scheduleRows, reports, songRows, announcementRows, settingsData, equipmentItemRows, equipmentLoanRows] = await Promise.all([
+      const [members, scheduleRows, reports, songRows, announcementRows, settingsData, equipmentItemRows, equipmentLoanRows, scheduleItemRows] = await Promise.all([
         readRows(supabaseClient.from('school_memberships').select('user_id, school_id, full_name, part, grade, grade_as_of, is_admin').eq('school_id', schoolId).order('full_name'), 'school_memberships'),
-        readRows(supabaseClient.from('schedules').select('id, title, content, starts_at, ends_at, location').eq('school_id', schoolId).order('starts_at'), 'schedules'),
+        readScheduleRows(schoolId),
         readRows(supabaseClient.from('reports').select('id, reporter_id, kind, report_date, title, reason, arrival_at, photo_url, status, created_at').eq('school_id', schoolId).order('created_at', { ascending: false }), 'reports'),
         readRows(supabaseClient.from('songs').select('id, title, sort_reading, composer, arranger, drive_url, youtube_url, audio_file_path').eq('school_id', schoolId), 'songs'),
         readRows(supabaseClient.from('announcements').select('id, title, body, created_at').eq('school_id', schoolId).order('created_at', { ascending: false }), 'announcements'),
         readOptionalRow(supabaseClient.from('club_settings').select('theme_page, theme_ink, theme_font').eq('school_id', schoolId).maybeSingle(), 'club_settings'),
         readRows(supabaseClient.from('equipment_items').select('id, name, total_count').eq('school_id', schoolId).order('name'), 'equipment_items'),
-        readRows(supabaseClient.from('equipment_loans').select('id, item_id, borrower_id, borrower_part, quantity, borrowed_at').eq('school_id', schoolId).is('returned_at', null).order('borrowed_at'), 'equipment_loans')
+        readRows(supabaseClient.from('equipment_loans').select('id, item_id, borrower_id, borrower_part, quantity, borrowed_at').eq('school_id', schoolId).is('returned_at', null).order('borrowed_at'), 'equipment_loans'),
+        readRows(supabaseClient.from('schedule_items').select('id, schedule_id, title, start_time, end_time, sort_order').eq('school_id', schoolId).order('sort_order'), 'schedule_items')
       ]);
       if (sequence !== loadSequence) return;
       const reportsForView = await Promise.all(reports.map(async report => {
@@ -582,7 +606,7 @@
         isOwner,
         plan,
         members: members.map(member => ({ id: member.user_id, name: member.full_name, part: formatPart(member.part), grade: currentGrade(member.grade, member.grade_as_of), role: member.is_admin })),
-        events: scheduleRows.map(item => ({ id: item.id, date: japanDateKey(item.starts_at), time: toJapanTime(item.starts_at), title: item.title, place: item.location, detail: item.content })),
+        events: scheduleRows.map(item => ({ id: item.id, date: japanDateKey(item.starts_at), time: item.starts_time_set === false ? '' : toJapanTime(item.starts_at), endTime: item.ends_at ? toJapanTime(item.ends_at) : '', title: item.title, place: item.location, detail: item.content, items: scheduleItemRows.filter(row => row.schedule_id === item.id).map(row => ({ id: row.id, title: row.title, start: (row.start_time || '').slice(0, 5), end: (row.end_time || '').slice(0, 5) })) })),
         requests: reportsForView.map(item => ({ id: item.id, dbStatus: item.status, type: reportKindLabel(item.kind), kind: item.kind, title: item.title, body: [item.reason, item.arrival_at ? `到着予定 ${item.arrival_at.slice(0,5)}` : ''].filter(Boolean).join(' · '), name: members.find(member => member.user_id === item.reporter_id)?.full_name || '部員', date: item.report_date, status: reportStatusLabel(item.status), photoPath: item.photo_url, photoUrl: item.photoUrl })),
         absences: reports.filter(item => item.kind === 'absence').map(item => ({ id: item.id, name: members.find(member => member.user_id === item.reporter_id)?.full_name || '部員', detail: [item.reason, item.arrival_at ? `到着予定 ${item.arrival_at.slice(0,5)}` : '欠席'].filter(Boolean).join(' · '), date: item.report_date })),
         songs: songRows.map(item => ({ id: item.id, title: item.title, byline: [item.composer, item.arranger && `${item.arranger} 編曲`].filter(Boolean).join(' / '), sortKey: item.sort_reading, drive: item.drive_url, youtube: item.youtube_url, audioKey: item.audio_file_path })),
@@ -629,7 +653,7 @@
         }, 180);
       };
       const channel = supabaseClient.channel(`school:${schoolId}`);
-      for (const table of ['profiles', 'schedules', 'reports', 'songs', 'announcements', 'club_settings', 'equipment_items', 'equipment_loans']) {
+      for (const table of ['profiles', 'schedules', 'reports', 'songs', 'announcements', 'club_settings', 'equipment_items', 'equipment_loans', 'schedule_items']) {
         channel.on('postgres_changes', { event: '*', schema: 'public', table, filter: `school_id=eq.${schoolId}` }, refresh);
       }
       channel.on('postgres_changes', { event: '*', schema: 'public', table: 'school_memberships', filter: `user_id=eq.${currentSession.user.id}` }, refresh);
@@ -710,7 +734,7 @@
     }
     function renderHome() {
       const todayKey = dayKey(new Date());
-      const todayEvent = data.events.find(event => event.date === todayKey);
+      const todayEvents = data.events.filter(event => event.date === todayKey);
       const todayAbsences = data.absences.filter(item => item.date === todayKey);
       const loanedCount = data.equipmentLoans.reduce((sum, loan) => sum + loan.quantity, 0);
       content.innerHTML = `
@@ -723,14 +747,14 @@
         </div>
         <div class="grid home-grid">
           <div class="stack">
-            <section class="panel"><div class="panel-head"><div><div class="panel-title">本日の練習</div><div class="panel-note">みんなで合わせる時間</div></div><button class="quiet-button" data-page="calendar">カレンダー →</button></div><div class="panel-body">${todayEvent ? `<div class="practice-card"><div class="practice-date">${escapeHtml(dateLabel(todayEvent.date))}</div><div class="practice-title">${escapeHtml(todayEvent.title)}</div><div class="practice-meta"><span>◷ ${escapeHtml(todayEvent.time)} — 18:30</span><span>⌖ ${escapeHtml(todayEvent.place)}</span></div></div><div class="panel-note" style="margin-top:11px">${escapeHtml(todayEvent.detail || '')}</div>` : '<div class="empty-state">今日は練習予定がありません。</div>'}</div></section>
+            <section class="panel"><div class="panel-head"><div><div class="panel-title">本日の練習</div><div class="panel-note">みんなで合わせる時間</div></div><button class="quiet-button" data-page="calendar">カレンダー →</button></div><div class="panel-body">${todayEvents.length ? todayEvents.map(event => practiceCardMarkup(event)).join('') : '<div class="empty-state">今日は練習予定がありません。</div>'}</div></section>
             <section class="panel"><div class="panel-head"><div><div class="panel-title">全体連絡</div><div class="panel-note">部員みんなへのお知らせ</div></div><span class="panel-note">${data.notices.length}件</span></div><div class="panel-body">${data.notices.length ? data.notices.slice(0,3).map(item => `<div class="announcement"><div class="announcement-mark">${escapeHtml(item.mark || '♪')}</div><div><div class="announcement-title">${escapeHtml(item.title)}</div><div class="announcement-copy">${escapeHtml(item.body)}</div><div class="announcement-date">${escapeHtml(dateLabel(item.date))}</div></div></div>`).join('') : '<div class="empty-state">新しい連絡はありません。</div>'}</div></section>
             <section class="panel"><div class="panel-head"><div><div class="panel-title">今日の欠席・遅刻</div><div class="panel-note">事前に届いた連絡</div></div><button class="quiet-button" data-page="calendar">履歴を見る →</button></div><div class="panel-body">${todayAbsences.length ? `<div class="person-list">${todayAbsences.map(item => `<div class="person-row"><div class="mini-avatar">${escapeHtml(initials(item.name))}</div><div class="person-info"><div class="person-name">${escapeHtml(item.name)}</div><div class="person-detail">${escapeHtml(item.detail)}</div></div><span class="person-tag">連絡済み</span></div>`).join('')}</div>` : '<div class="empty-state">欠席・遅刻の連絡はありません。</div>'}</div></section>
           </div>
           <div class="stack">
             ${renderPushPanel()}
             <section class="panel"><div class="panel-head"><div><div class="panel-title">落とし物のお知らせ</div><div class="panel-note">心当たりはありませんか？</div></div><button class="quiet-button" data-form="lost">報告する</button></div><div class="panel-body"><div class="lost-feature"><img class="lost-image" src="${escapeHtml(data.lost.image)}" alt="${escapeHtml(data.lost.title)}" onerror="this.src='https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=440&q=80'"><div><div class="lost-title">${escapeHtml(data.lost.title)}</div><div class="lost-copy">${escapeHtml(data.lost.body)}</div><div class="lost-date">${escapeHtml(dateLabel(data.lost.date))}</div></div></div></div></section>
-            <section class="panel"><div class="panel-head"><div><div class="panel-title">今週の予定</div><div class="panel-note">次の合奏まであと少し</div></div></div><div class="panel-body">${data.events.filter(item => item.date >= todayKey).slice(0,3).map(item => `<div class="detail-row"><div class="detail-time">${escapeHtml(new Date(`${item.date}T12:00:00`).getDate())}日</div><div class="person-info"><div class="person-name">${escapeHtml(item.title)}</div><div class="person-detail">${escapeHtml(item.time)} · ${escapeHtml(item.place)}</div></div></div>`).join('') || '<div class="empty-state">予定はありません。</div>'}</div></section>
+            <section class="panel"><div class="panel-head"><div><div class="panel-title">今週の予定</div><div class="panel-note">次の合奏まであと少し</div></div></div><div class="panel-body">${data.events.filter(item => item.date >= todayKey).slice(0,3).map(item => `<div class="detail-row"><div class="detail-time">${escapeHtml(new Date(`${item.date}T12:00:00`).getDate())}日</div><div class="person-info"><div class="person-name">${escapeHtml(item.title)}</div><div class="person-detail">${escapeHtml([timeRangeLabel(item.time, item.endTime), item.place].filter(Boolean).join(' · '))}</div></div></div>`).join('') || '<div class="empty-state">予定はありません。</div>'}</div></section>
             <section class="panel"><div class="panel-head"><div><div class="panel-title">部員招待コード</div><div class="panel-note">このコードを共有すると部員が参加できます</div></div></div><div class="panel-body"><div class="invite-code">${escapeHtml(data.inviteCode || '未設定')}</div>${data.inviteCode ? '<button class="secondary-button" style="margin-top:10px" data-action="copy-invite-code">コードをコピー</button>' : ''}</div></section>
           </div>
         </div>`;
@@ -750,7 +774,7 @@
       const dateAbsences = data.absences.filter(item => item.date === selectedDate);
       content.innerHTML = `<div class="welcome-row"><div><div class="eyebrow">SCHEDULE</div><h1>カレンダー</h1><div class="subheading">練習予定と、部員の出欠を確認できます。</div></div></div>
         <div class="panel calendar"><div class="panel-head"><div class="month-switch"><button class="icon-button" data-month="-1" aria-label="前の月">‹</button><div class="month-title">${year}年 ${month+1}月</div><button class="icon-button" data-month="1" aria-label="次の月">›</button></div><button class="secondary-button" data-month="today">今日</button></div><div class="calendar-grid">${weekdays.map(day => `<div class="calendar-weekday">${day}</div>`).join('')}${dayCells}</div></div>
-        <section class="panel calendar-detail"><div class="panel-head"><div><div class="panel-title">${escapeHtml(dateLabel(selectedDate))}の予定と出欠</div><div class="panel-note">過去の履歴・未来の欠席予定も確認できます</div></div></div><div class="panel-body">${dateEvents.map(item => `<div class="detail-row"><div class="detail-time">${escapeHtml(item.time)}</div><div class="person-info"><div class="person-name">${escapeHtml(item.title)}</div><div class="person-detail">${escapeHtml(item.place)} · ${escapeHtml(item.detail)}</div></div></div>`).join('')}${dateAbsences.map(item => `<div class="detail-row"><div class="detail-time">${escapeHtml(item.name.split(' ')[0])}</div><div class="person-info"><div class="person-name">${escapeHtml(item.name)} · 欠席/遅刻</div><div class="person-detail">${escapeHtml(item.detail)}</div></div></div>`).join('')}${!dateEvents.length&&!dateAbsences.length?'<div class="detail-empty">この日の予定・連絡はありません。</div>':''}</div></section>`;
+        <section class="panel calendar-detail"><div class="panel-head"><div><div class="panel-title">${escapeHtml(dateLabel(selectedDate))}の予定と出欠</div><div class="panel-note">${dateEvents.length ? '活動枠をタップすると詳細が開きます' : '過去の履歴・未来の欠席予定も確認できます'}</div></div></div><div class="panel-body">${dateEvents.map(item => expandedEventId === item.id ? practiceCardMarkup(item, { closeId: item.id }) : `<button type="button" class="detail-row event-toggle" data-action="toggle-event" data-id="${escapeHtml(item.id)}"><div class="detail-time">${escapeHtml(item.time || '—')}</div><div class="person-info"><div class="person-name">${escapeHtml(item.title)}</div><div class="person-detail">${escapeHtml([timeRangeLabel(item.time, item.endTime), item.place].filter(Boolean).join(' · '))}${item.items && item.items.length ? ` · タイムテーブル${item.items.length}件` : ''}</div></div><span class="panel-note">›</span></button>`).join('')}${dateAbsences.map(item => `<div class="detail-row"><div class="detail-time">${escapeHtml(item.name.split(' ')[0])}</div><div class="person-info"><div class="person-name">${escapeHtml(item.name)} · 欠席/遅刻</div><div class="person-detail">${escapeHtml(item.detail)}</div></div></div>`).join('')}${!dateEvents.length&&!dateAbsences.length?'<div class="detail-empty">この日の予定・連絡はありません。</div>':''}</div></section>`;
     }
     function renderLibrary(query = '') {
       const collator = new Intl.Collator('en', { sensitivity: 'base', numeric: true });
@@ -781,6 +805,7 @@
       }).join('');
     }
 function renderAdmin() {
+  syncScheduleDraft('create');
       // 欠席連絡を除外した、確認待ちの件数を計算
       const activeRequests = data.requests.filter(item => item.kind !== 'absence');
       const pendingCount = activeRequests.filter(item => item.status === '確認待ち').length;
@@ -859,7 +884,7 @@ function renderAdmin() {
           <section class="panel"><div class="panel-head"><div><div class="panel-title">団体のデザイン</div><div class="panel-note">背景色・文字色・フォントをカスタマイズ</div></div></div><div class="panel-body"><div class="theme-preview" id="themePreview"><strong>青葉高校 吹奏楽部</strong><span>この団体のテーマプレビュー</span></div><div class="theme-controls"><label class="color-field">背景色 <input type="color" id="themePage" value="${escapeHtml(data.theme.page)}"></label><label class="color-field">文字色 <input type="color" id="themeInk" value="${escapeHtml(data.theme.ink)}"></label></div><div class="field" style="margin-top:12px"><label for="themeFont">フォント</label><select id="themeFont"><option ${data.theme.font==='DM Sans'?'selected':''}>DM Sans</option><option ${data.theme.font==='Noto Sans JP'?'selected':''}>Noto Sans JP</option></select></div><div style="display:flex;justify-content:flex-end;margin-top:12px"><button class="primary-button" data-action="save-theme">テーマを保存</button></div></div></section>
         </div><div class="stack">
           ${renderHistoryLauncher()}
-          <section class="panel"><div class="panel-head"><div><div class="panel-title">練習予定を作成</div><div class="panel-note">カレンダーとホームに表示</div></div></div><div class="panel-body"><form id="eventForm" class="field-grid"><div class="field full"><label for="eventDate">日付</label><input id="eventDate" type="date" required value="${shiftDay(1)}"></div><div class="field full"><label>開始時刻</label><div class="clock-area" id="eventClockArea"></div></div><div class="field full"><label for="eventTitle">練習内容</label><input id="eventTitle" required placeholder="例：合奏練習"></div><div class="field full"><label for="eventPlace">場所</label><input id="eventPlace" required placeholder="例：音楽室"></div><div class="field full"><label for="eventDetail">詳細</label><input id="eventDetail" placeholder="練習内容など"></div><div class="field full"><button class="primary-button" type="submit">予定を追加</button></div></form></div></section>
+          <section class="panel"><div class="panel-head"><div><div class="panel-title">練習予定を作成</div><div class="panel-note">カレンダーとホームに表示</div></div></div><div class="panel-body"><form id="eventForm" class="field-grid"><div class="field full"><label for="eventDate">日付</label><input id="eventDate" type="date" required value="${shiftDay(1)}"></div><div class="field full"><label>活動時間（任意）</label><div id="schedTimes-create"></div></div><div class="field full"><label for="eventTitle">練習内容</label><input id="eventTitle" required placeholder="例：合奏練習"></div><div class="field full"><label for="eventPlace">場所</label><input id="eventPlace" required placeholder="例：音楽室"></div><div class="field full"><label for="eventDetail">詳細</label><input id="eventDetail" placeholder="練習内容など"></div><div class="field full"><label>タイムテーブル（任意）</label><div id="schedMenus-create"></div><div class="panel-note" style="margin-top:6px">メニューを追加しなければ、これまでどおり活動枠だけが表示されます。</div></div><div class="field full"><button class="primary-button" type="submit">予定を追加</button></div></form></div></section>
           <section class="panel"><div class="panel-head"><div><div class="panel-title">全体連絡を投稿</div><div class="panel-note">ホーム画面に掲載されます</div></div></div><div class="panel-body"><form id="noticeForm" class="field-grid">
   <div class="field full">
     <label for="noticeTitle">タイトル</label>
@@ -886,7 +911,7 @@ function renderAdmin() {
 
       const previewTitle = content.querySelector('#themePreview strong');
       if (previewTitle) previewTitle.textContent = `${data.schoolName} ${data.clubName}`;
-      renderClock('event');
+      renderScheduleEditor('create');
 }
 
     function showToast(message) {
@@ -1025,6 +1050,7 @@ function renderAdmin() {
       return `<button class="history-launch" type="button" data-action="open-history" style="background:${bg};border-color:${border};color:${text}"><span>履歴</span><span class="history-launch-note">全体連絡・練習予定の確認／編集／削除</span><span aria-hidden="true">›</span></button>`;
     }
     let historyState = { tab: 'notice', announcements: [], schedules: [], editing: null };
+    const HISTORY_SCHEDULE_COLUMNS = 'id, title, content, starts_at, ends_at, location, starts_time_set';
     const historyDateLabel = key => new Intl.DateTimeFormat('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' }).format(new Date(`${key}T12:00:00`));
     const clipText = (value, max) => { const chars = Array.from(String(value ?? '').replace(/\s+/g, ' ').trim()); return chars.length > max ? `${chars.slice(0, max - 1).join('')}…` : chars.join(''); };
     function groupByDate(items, getKey) {
@@ -1051,9 +1077,9 @@ function renderAdmin() {
         const buttons = '<div class="field full" style="display:flex;gap:8px"><button class="primary-button" type="submit">保存</button><button class="secondary-button" type="button" data-action="history-back">戻る</button></div>';
         const form = kind === 'notice'
           ? `<form id="historyEditForm" data-kind="notice" data-id="${escapeHtml(item.id)}" class="field-grid"><div class="field full"><label for="historyTitle">タイトル</label><input id="historyTitle" required maxlength="100" value="${escapeHtml(item.title)}"></div><div class="field full"><label for="historyBody">本文</label><textarea id="historyBody" rows="5">${escapeHtml(item.body)}</textarea></div><div class="field full"><div class="panel-note">編集しても、通知は再送されません。</div></div>${buttons}</form>`
-          : `<form id="historyEditForm" data-kind="schedule" data-id="${escapeHtml(item.id)}" class="field-grid"><div class="field full"><label for="historyDate">日付</label><input id="historyDate" type="date" required value="${japanDateKey(item.starts_at)}"></div><div class="field full"><label>開始時刻</label><div class="clock-area" id="historyClockArea"></div></div><div class="field full"><label for="historyTitle">練習内容</label><input id="historyTitle" required value="${escapeHtml(item.title)}"></div><div class="field full"><label for="historyPlace">場所</label><input id="historyPlace" required value="${escapeHtml(item.location)}"></div><div class="field full"><label for="historyDetail">詳細</label><input id="historyDetail" value="${escapeHtml(item.content)}"></div>${buttons}</form>`;
+          : `<form id="historyEditForm" data-kind="schedule" data-id="${escapeHtml(item.id)}" class="field-grid"><div class="field full"><label for="historyDate">日付</label><input id="historyDate" type="date" required value="${japanDateKey(item.starts_at)}"></div><div class="field full"><label>活動時間（任意）</label><div id="schedTimes-edit"></div></div><div class="field full"><label for="historyTitle">練習内容</label><input id="historyTitle" required value="${escapeHtml(item.title)}"></div><div class="field full"><label for="historyPlace">場所</label><input id="historyPlace" required value="${escapeHtml(item.location)}"></div><div class="field full"><label for="historyDetail">詳細</label><input id="historyDetail" value="${escapeHtml(item.content)}"></div><div class="field full"><label>タイムテーブル（任意）</label><div id="schedMenus-edit"></div></div>${buttons}</form>`;
         openModal(kind === 'notice' ? '全体連絡を編集' : '練習予定を編集', form);
-        if (kind === 'schedule') renderClock('history');
+        if (kind === 'schedule') renderScheduleEditor('edit');
         return;
       }
       const isNotice = state.tab === 'notice';
@@ -1064,7 +1090,7 @@ function renderAdmin() {
       const list = groups.length
         ? groups.map(([key, items]) => `<div class="history-date">${escapeHtml(historyDateLabel(key))}</div>${items.map(item => isNotice
             ? historyRow('notice', item, clipText(item.body, 60))
-            : historyRow('schedule', item, `${toJapanTime(item.starts_at)} · ${item.location}`)).join('')}`).join('')
+            : historyRow('schedule', item, [timeRangeLabel(item.starts_time_set === false ? '' : toJapanTime(item.starts_at), item.ends_at ? toJapanTime(item.ends_at) : ''), item.location].filter(Boolean).join(' · '))).join('')}`).join('')
         : `<div class="empty-state">${isNotice ? '全体連絡' : '練習予定'}の履歴はありません。</div>`;
       openModal('履歴', `${tabs}${list}`);
       modal.scrollTop = scrollTop;
@@ -1074,7 +1100,7 @@ function renderAdmin() {
       openModal('履歴', '<div class="empty-state">読み込み中…</div>');
       const [announcements, schedules] = await Promise.all([
         supabaseClient.from('announcements').select('id, title, body, created_at').eq('school_id', data.schoolId).order('created_at', { ascending: false }).limit(300),
-        supabaseClient.from('schedules').select('id, title, content, starts_at, location').eq('school_id', data.schoolId).order('starts_at', { ascending: false }).limit(300)
+        supabaseClient.from('schedules').select(HISTORY_SCHEDULE_COLUMNS).eq('school_id', data.schoolId).order('starts_at', { ascending: false }).limit(300)
       ]);
       historyState.announcements = checkedData(announcements);
       historyState.schedules = checkedData(schedules);
@@ -1105,11 +1131,10 @@ function renderAdmin() {
       } else {
         const place = value('historyPlace');
         if (!place) throw new Error('場所を入力してください。');
-        if (clocks.history.hour === null || clocks.history.minute === null) throw new Error('開始時刻（時と分）を選んでください。');
-        const startsAt = new Date(`${value('historyDate')}T${clockValue('history')}:00+09:00`).toISOString();
-        const updated = checkedData(await supabaseClient.from('schedules').update({ title, location: place, content: value('historyDetail'), starts_at: startsAt }).eq('id', id).eq('school_id', data.schoolId).select('id, title, content, starts_at, location'));
-        if (!updated.length) throw new Error('保存できませんでした。すでに削除されているか、権限がありません。');
-        historyState.schedules = historyState.schedules.map(row => row.id === id ? updated[0] : row).sort((a, b) => new Date(b.starts_at) - new Date(a.starts_at));
+        const payload = buildSchedulePayload('edit', { id, title, place, detail: value('historyDetail'), date: value('historyDate') });
+        const { error: saveError } = await supabaseClient.rpc('save_schedule', payload);
+        if (saveError) throw saveError;
+        historyState.schedules = checkedData(await supabaseClient.from('schedules').select(HISTORY_SCHEDULE_COLUMNS).eq('school_id', data.schoolId).order('starts_at', { ascending: false }).limit(300));
       }
       historyState.editing = null;
       renderHistory();
@@ -1181,6 +1206,89 @@ function renderAdmin() {
       renderClock('arrival');
       document.getElementById('arrivalField').hidden = absenceKind !== '遅刻';
     }
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Enter' && !event.isComposing && event.target.classList && event.target.classList.contains('menu-title')) event.preventDefault();
+    });
+    function timeRangeLabel(start, end) {
+      return start && end ? `${start}–${end}` : start ? `${start}〜` : end ? `〜${end}` : '';
+    }
+    function pickKeyOf(key) { return key === 'create' ? 'pickCreate' : 'pickEdit'; }
+    function draftSlot(draft, target) {
+      if (target === 'start' || target === 'end') return { obj: draft, key: target };
+      const match = /^i(\d+)([se])$/.exec(target || '');
+      if (!match || !draft.items[Number(match[1])]) return null;
+      return { obj: draft.items[Number(match[1])], key: match[2] === 's' ? 'start' : 'end' };
+    }
+    function syncScheduleDraft(key) {
+      const draft = scheduleDrafts[key];
+      document.querySelectorAll(`#schedMenus-${key} .menu-title`).forEach(input => {
+        const item = draft.items[Number(input.dataset.i)];
+        if (item) item.title = input.value;
+      });
+    }
+    function renderScheduleEditor(key) {
+      const draft = scheduleDrafts[key];
+      const timesBox = document.getElementById(`schedTimes-${key}`);
+      const menusBox = document.getElementById(`schedMenus-${key}`);
+      if (!timesBox || !menusBox) return;
+      const chip = (target, label, value) => `<button type="button" class="time-chip ${value ? '' : 'empty'} ${draft.picker === target ? 'active' : ''}" data-action="sched-pick" data-sched="${key}" data-target="${target}"><span>${label}</span><strong>${value || '--:--'}</strong></button>`;
+      const picker = `<div class="sched-picker"><div class="clock-area" id="pick-${key}"></div><div class="sched-picker-actions"><button type="button" class="quiet-button" data-action="sched-pick-clear" data-sched="${key}">この時刻を消す</button><button type="button" class="primary-button" data-action="sched-pick-ok" data-sched="${key}">決定</button></div></div>`;
+      const frameOpen = draft.picker === 'start' || draft.picker === 'end';
+      timesBox.innerHTML = `<div class="sched-times">${chip('start', '開始', draft.start)}<span class="panel-note">〜</span>${chip('end', '終了', draft.end)}</div>${frameOpen ? picker : ''}`;
+      menusBox.innerHTML = draft.items.map((item, index) => `<div class="menu-row"><input class="menu-title" data-i="${index}" maxlength="60" autocomplete="off" placeholder="メニュー名（例：基礎練習）" value="${escapeHtml(item.title)}">${chip(`i${index}s`, '開始', item.start)}${chip(`i${index}e`, '終了', item.end)}<button type="button" class="icon-button" data-action="sched-menu-remove" data-sched="${key}" data-i="${index}" aria-label="このメニューを削除">×</button></div>${!frameOpen && draft.picker && new RegExp(`^i${index}[se]$`).test(draft.picker) ? picker : ''}`).join('')
+        + `<button type="button" class="secondary-button" style="margin-top:6px" data-action="sched-menu-add" data-sched="${key}">＋　メニューを追加</button>`;
+      if (draft.picker) renderClock(pickKeyOf(key));
+    }
+    function openSchedulePicker(key, target) {
+      syncScheduleDraft(key);
+      const draft = scheduleDrafts[key];
+      if (draft.picker === target) { draft.picker = null; renderScheduleEditor(key); return; }
+      const slot = draftSlot(draft, target);
+      if (!slot) return;
+      const current = slot.obj[slot.key];
+      const [hour, minute] = current ? current.split(':').map(Number) : [null, null];
+      Object.assign(clocks[pickKeyOf(key)], { hour, minute, step: 'hour' });
+      draft.picker = target;
+      renderScheduleEditor(key);
+    }
+    function commitSchedulePicker(key) {
+      const draft = scheduleDrafts[key];
+      const clock = clocks[pickKeyOf(key)];
+      const slot = draftSlot(draft, draft.picker);
+      if (!slot) return;
+      if (clock.hour === null) { showToast('時を選んでください'); return; }
+      slot.obj[slot.key] = `${String(clock.hour).padStart(2, '0')}:${String(clock.minute ?? 0).padStart(2, '0')}`;
+      draft.picker = null;
+      renderScheduleEditor(key);
+    }
+    function buildSchedulePayload(key, fields) {
+      syncScheduleDraft(key);
+      const draft = scheduleDrafts[key];
+      if (draft.start && draft.end && draft.end <= draft.start) throw new Error('終了時刻は開始時刻より後にしてください。');
+      const items = [];
+      draft.items.forEach((item, index) => {
+        const title = item.title.trim();
+        if (!title && !item.start && !item.end) return;
+        if (!title) throw new Error(`${index + 1}行目のメニュー名を入力してください。`);
+        if (item.start && item.end && item.end <= item.start) throw new Error(`「${title}」の終了時刻は開始時刻より後にしてください。`);
+        items.push({ title, start: item.start, end: item.end });
+      });
+      return { p_id: fields.id || null, p_school_id: data.schoolId, p_title: fields.title, p_location: fields.place, p_content: fields.detail, p_date: fields.date, p_start: draft.start, p_end: draft.end, p_items: items };
+    }
+    function practiceCardMarkup(event, options = {}) {
+      const range = timeRangeLabel(event.time, event.endTime);
+      const menus = (event.items || []).map(item => {
+        const itemRange = timeRangeLabel(item.start, item.end);
+        return `<div class="menu-card">${itemRange ? `<div class="menu-card-time">${escapeHtml(itemRange)}</div>` : ''}<div class="menu-card-title">${escapeHtml(item.title)}</div></div>`;
+      }).join('');
+      return `<div class="practice-card">${options.closeId ? `<button type="button" class="practice-close" data-action="toggle-event" data-id="${escapeHtml(options.closeId)}">閉じる</button>` : ''}<div class="practice-date">${escapeHtml(dateLabel(event.date))}</div><div class="practice-title">${escapeHtml(event.title)}</div><div class="practice-meta">${range ? `<span>◷ ${escapeHtml(range)}</span>` : ''}${event.place ? `<span>⌖ ${escapeHtml(event.place)}</span>` : ''}</div>${event.detail ? `<div class="practice-detail">${escapeHtml(event.detail)}</div>` : ''}${menus ? `<div class="timetable">${menus}</div>` : ''}</div>`;
+    }
+    async function readScheduleRows(schoolId) {
+      const columns = 'id, title, content, starts_at, ends_at, location';
+      let result = await supabaseClient.from('schedules').select(`${columns}, starts_time_set`).eq('school_id', schoolId).order('starts_at');
+      if (result.error && result.error.code === '42703') result = await supabaseClient.from('schedules').select(columns).eq('school_id', schoolId).order('starts_at');
+      return readRows(Promise.resolve(result), 'schedules');
+    }
     function openSongModal(song = null) {
       const editing = Boolean(song);
       openModal(editing?'曲を編集':'ライブラリに曲を追加', `<form id="songForm" class="field-grid"><div class="field full"><label for="songTitle">曲名</label><input id="songTitle" required value="${escapeHtml(song?.title||'')}" placeholder="例：宝島"></div><div class="field full"><label for="songByline">作曲・編曲者</label><input id="songByline" required value="${escapeHtml(song?.byline||'')}" placeholder="作曲者 / 編曲者"></div><div class="field full"><label for="songSort">並び替え用の読み（ローマ字）</label><input id="songSort" value="${escapeHtml(song?.sortKey||'')}" placeholder="例：Takarajima"></div><div class="field full"><label for="songDrive">Google Driveの楽譜URL</label><input id="songDrive" type="url" value="${escapeHtml(song?.drive||'')}" placeholder="https://drive.google.com/..."></div><div class="field full"><label for="songYoutube">YouTube参考音源URL</label><input id="songYoutube" type="url" value="${escapeHtml(song?.youtube||'')}" placeholder="https://www.youtube.com/..."></div><div class="field full"><label for="songAudio">音源ファイル ${song?.audioKey?'（新しいファイルを選ぶと差し替え）':''}</label><input id="songAudio" type="file" accept="audio/*,.mp3,.m4a,.wav,.ogg"></div><div class="field full"><div class="modal-footer"><button type="button" class="secondary-button" data-action="close-modal">キャンセル</button><button type="submit" class="primary-button">保存</button></div></div></form>`);
@@ -1231,10 +1339,23 @@ function renderAdmin() {
       if (target.dataset.action === 'open-history') { openHistory().catch(showDatabaseError); return; }
       if (target.dataset.action === 'history-tab') { historyState.tab = target.dataset.tab === 'schedule' ? 'schedule' : 'notice'; renderHistory(); return; }
       if (target.dataset.action === 'history-edit') {
-        historyState.editing = { kind: target.dataset.kind, id: target.dataset.id };
-        const editingRow = target.dataset.kind === 'schedule' ? historyState.schedules.find(row => row.id === target.dataset.id) : null;
-        if (editingRow) { const [h, m] = toJapanTime(editingRow.starts_at).split(':').map(Number); Object.assign(clocks.history, { hour: h, minute: m, step: 'hour' }); }
-        renderHistory();
+        const editKind = target.dataset.kind, editId = target.dataset.id;
+        (async () => {
+          if (editKind === 'schedule') {
+            const row = historyState.schedules.find(entry => entry.id === editId);
+            if (!row) return;
+            const itemsResult = await supabaseClient.from('schedule_items').select('title, start_time, end_time, sort_order').eq('schedule_id', editId).order('sort_order');
+            if (itemsResult.error && itemsResult.error.code !== 'PGRST205' && itemsResult.error.code !== '42P01') throw itemsResult.error;
+            scheduleDrafts.edit = {
+              start: row.starts_time_set === false ? null : toJapanTime(row.starts_at),
+              end: row.ends_at ? toJapanTime(row.ends_at) : null,
+              items: (itemsResult.data || []).map(entry => ({ title: entry.title, start: (entry.start_time || '').slice(0, 5) || null, end: (entry.end_time || '').slice(0, 5) || null })),
+              picker: null
+            };
+          }
+          historyState.editing = { kind: editKind, id: editId };
+          renderHistory();
+        })().catch(showDatabaseError);
         return;
       }
       if (target.dataset.action === 'history-back') { historyState.editing = null; renderHistory(); return; }
@@ -1270,10 +1391,47 @@ function renderAdmin() {
       if (target.dataset.clock && clocks[target.dataset.clock]) {
         const clockKey = target.dataset.clock;
         const clock = clocks[clockKey];
-        if (target.dataset.clockHour !== undefined) { clock.hour = Number(target.dataset.clockHour); clock.step = 'minute'; }
-        else if (target.dataset.clockMinute !== undefined) clock.minute = Number(target.dataset.clockMinute);
-        else if (target.dataset.clockStep) clock.step = target.dataset.clockStep;
-        renderClock(clockKey);
+        const isPicker = clockKey === 'pickCreate' || clockKey === 'pickEdit';
+        if (target.dataset.clockHour !== undefined) { clock.hour = Number(target.dataset.clockHour); clock.step = 'minute'; renderClock(clockKey); }
+        else if (target.dataset.clockMinute !== undefined) {
+          clock.minute = Number(target.dataset.clockMinute);
+          if (isPicker && clock.hour !== null) commitSchedulePicker(clockKey === 'pickCreate' ? 'create' : 'edit');
+          else { if (isPicker) clock.step = 'hour'; renderClock(clockKey); }
+        }
+        else if (target.dataset.clockStep) { clock.step = target.dataset.clockStep; renderClock(clockKey); }
+        return;
+      }
+      if (target.dataset.action === 'sched-pick') { openSchedulePicker(target.dataset.sched, target.dataset.target); return; }
+      if (target.dataset.action === 'sched-pick-close') { scheduleDrafts[target.dataset.sched].picker = null; renderScheduleEditor(target.dataset.sched); return; }
+      if (target.dataset.action === 'sched-pick-clear') {
+        const key = target.dataset.sched, draft = scheduleDrafts[key], slot = draftSlot(draft, draft.picker);
+        if (slot) slot.obj[slot.key] = null;
+        draft.picker = null;
+        renderScheduleEditor(key);
+        return;
+      }
+      if (target.dataset.action === 'sched-pick-ok') { commitSchedulePicker(target.dataset.sched); return; }
+      if (target.dataset.action === 'sched-menu-add') {
+        const key = target.dataset.sched;
+        syncScheduleDraft(key);
+        if (scheduleDrafts[key].items.length >= 30) { showToast('メニューは30件までです'); return; }
+        scheduleDrafts[key].items.push({ title: '', start: null, end: null });
+        renderScheduleEditor(key);
+        const inputs = document.querySelectorAll(`#schedMenus-${key} .menu-title`);
+        if (inputs.length) inputs[inputs.length - 1].focus();
+        return;
+      }
+      if (target.dataset.action === 'sched-menu-remove') {
+        const key = target.dataset.sched;
+        syncScheduleDraft(key);
+        scheduleDrafts[key].items.splice(Number(target.dataset.i), 1);
+        scheduleDrafts[key].picker = null;
+        renderScheduleEditor(key);
+        return;
+      }
+      if (target.dataset.action === 'toggle-event') {
+        expandedEventId = expandedEventId === target.dataset.id ? null : target.dataset.id;
+        renderCalendar();
         return;
       }
       if (target.dataset.month) { if(target.dataset.month==='today') calendarDate=new Date(); else calendarDate.setMonth(calendarDate.getMonth()+Number(target.dataset.month)); renderCalendar(); return; }
@@ -1502,9 +1660,10 @@ function renderAdmin() {
           closeModal(); await loadWorkspace(currentSession.user); showToast('ライブラリを更新しました'); return;
         }
         if(form.id==='eventForm') {
-          if (clocks.event.hour === null || clocks.event.minute === null) throw new Error('開始時刻（時と分）を選んでください。');
-          const startsAt=new Date(`${document.getElementById('eventDate').value}T${clockValue('event')}:00+09:00`).toISOString();
-          checkedData(await supabaseClient.from('schedules').insert({school_id:data.schoolId,title:document.getElementById('eventTitle').value.trim(),content:document.getElementById('eventDetail').value.trim(),starts_at:startsAt,location:document.getElementById('eventPlace').value.trim()}));
+          const payload = buildSchedulePayload('create', { id: null, title: document.getElementById('eventTitle').value.trim(), place: document.getElementById('eventPlace').value.trim(), detail: document.getElementById('eventDetail').value.trim(), date: document.getElementById('eventDate').value });
+          const { error: saveError } = await supabaseClient.rpc('save_schedule', payload);
+          if (saveError) throw saveError;
+          scheduleDrafts.create = freshScheduleDraft();
           await loadWorkspace(currentSession.user); showToast('練習予定を追加しました'); return;
         }
                 if(form.id==='noticeForm') {
