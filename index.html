@@ -340,7 +340,7 @@
     <main class="main">
       <header class="topbar">
         <div class="top-left"><button class="icon-button mobile-menu" id="menuButton" aria-label="メニューを開く">☰</button><div class="crumb"><span id="crumbSchool">Tutti</span> / <strong id="crumbTitle">ホーム</strong></div></div>
-        <div class="top-actions"><span class="today-label" id="topDate"></span><button class="icon-button" id="installAppButton" title="アプリをインストール" aria-label="アプリをインストール" hidden>↓</button><button class="icon-button" id="noticeButton" title="連絡フォームを開く" aria-label="連絡フォーム">＋</button><div class="user-avatar" id="topUserAvatar" style="width:31px;height:31px;font-size:11px">♪</div></div>
+        <div class="top-actions"><span class="today-label" id="topDate"></span><button class="icon-button" id="installAppButton" title="アプリをインストール" aria-label="アプリをインストール" hidden>↓</button><div class="user-avatar" id="topUserAvatar" style="width:31px;height:31px;font-size:11px">♪</div></div>
       </header>
       <section class="content" id="content"></section>
     </main>
@@ -734,7 +734,7 @@
       }).join('');
       const dateEvents = data.events.filter(item => item.date === selectedDate);
       const dateAbsences = data.absences.filter(item => item.date === selectedDate);
-      content.innerHTML = `<div class="welcome-row"><div><div class="eyebrow">SCHEDULE</div><h1>カレンダー</h1><div class="subheading">練習予定と、部員の出欠を確認できます。</div></div><button class="primary-button" data-form="absence">＋　欠席を連絡</button></div>
+      content.innerHTML = `<div class="welcome-row"><div><div class="eyebrow">SCHEDULE</div><h1>カレンダー</h1><div class="subheading">練習予定と、部員の出欠を確認できます。</div></div></div>
         <div class="panel calendar"><div class="panel-head"><div class="month-switch"><button class="icon-button" data-month="-1" aria-label="前の月">‹</button><div class="month-title">${year}年 ${month+1}月</div><button class="icon-button" data-month="1" aria-label="次の月">›</button></div><button class="secondary-button" data-month="today">今日</button></div><div class="calendar-grid">${weekdays.map(day => `<div class="calendar-weekday">${day}</div>`).join('')}${dayCells}</div></div>
         <section class="panel calendar-detail"><div class="panel-head"><div><div class="panel-title">${escapeHtml(dateLabel(selectedDate))}の予定と出欠</div><div class="panel-note">過去の履歴・未来の欠席予定も確認できます</div></div></div><div class="panel-body">${dateEvents.map(item => `<div class="detail-row"><div class="detail-time">${escapeHtml(item.time)}</div><div class="person-info"><div class="person-name">${escapeHtml(item.title)}</div><div class="person-detail">${escapeHtml(item.place)} · ${escapeHtml(item.detail)}</div></div></div>`).join('')}${dateAbsences.map(item => `<div class="detail-row"><div class="detail-time">${escapeHtml(item.name.split(' ')[0])}</div><div class="person-info"><div class="person-name">${escapeHtml(item.name)} · 欠席/遅刻</div><div class="person-detail">${escapeHtml(item.detail)}</div></div></div>`).join('')}${!dateEvents.length&&!dateAbsences.length?'<div class="detail-empty">この日の予定・連絡はありません。</div>':''}</div></section>`;
     }
@@ -1271,7 +1271,6 @@ function renderAdmin() {
         return;
       }
       if (target.id==='menuButton') { openDrawer(); return; }
-      if (target.id==='noticeButton') { openRequestForm('absence'); return; }
       if (target.id==='clubSwitch') { openGroupSwitcher(); return; }
     }
     function openDrawer() { document.getElementById('sidebar').classList.add('open'); document.getElementById('scrim').classList.add('open'); }
