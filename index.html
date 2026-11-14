@@ -224,16 +224,27 @@
     .reason-options { display: flex; flex-wrap: wrap; gap: 7px; }
     .reason-option { padding: 7px 10px; border: 1px solid var(--line); border-radius: 7px; background: white; color: #66736c; cursor: pointer; font-size: 11px; }
     .reason-option.selected { border-color: var(--green); background: var(--green-pale); color: var(--green); }
-    .clock-controls { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 14px 0; }
-    .clock-dial { width: 190px; height: 190px; position: relative; border: 1px solid #dfe7df; border-radius: 50%; background: #f7faf7; }
+    [hidden] { display: none !important; }
+    .clock-area { display: grid; justify-items: center; gap: 8px; margin: 10px 0; }
+    .clock-step { font-size: 12px; font-weight: 700; color: var(--green); }
+    .clock-dial { width: 250px; height: 250px; position: relative; border: 1px solid #dfe7df; border-radius: 50%; background: #f7faf7; }
+    .clock-dial.hour-mode { background: #fff3d6; border-color: #ecd9a6; }
+    .clock-inner { position: absolute; top: 50%; left: 50%; width: 164px; height: 164px; margin: -82px; border-radius: 50%; background: #e3eaf6; border: 1px solid #c8d4ea; }
     .clock-center { position: absolute; top: 50%; left: 50%; width: 9px; height: 9px; border-radius: 50%; background: var(--green); transform: translate(-50%,-50%); }
-    .clock-hand { position: absolute; top: 50%; left: 50%; width: 2px; height: 60px; background: var(--green); transform-origin: 50% 0; }
-    .clock-number { position: absolute; width: 30px; height: 30px; margin: -15px; border: 0; border-radius: 50%; background: transparent; color: #496258; cursor: pointer; font-size: 11px; }
+    .clock-hand { position: absolute; left: 50%; bottom: 50%; width: 2px; margin-left: -1px; background: var(--green); transform-origin: 50% 100%; }
+    .clock-number { position: absolute; width: 28px; height: 28px; margin: -14px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: #496258; cursor: pointer; font-size: 12px; }
     .clock-number.selected { color: white; background: var(--green); }
-    .ampm { display: grid; gap: 7px; }
-    .ampm button { border: 1px solid var(--line); border-radius: 7px; padding: 7px 10px; background: white; cursor: pointer; font-size: 11px; }
-    .ampm button.selected { background: var(--green-pale); color: var(--green); border-color: #a8c6b6; }
-    .clock-hint { color: var(--muted); text-align: center; font-size: 10px; }
+    .clock-legend { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+    .clock-legend span { padding: 3px 9px; border-radius: 99px; font-size: 10px; }
+    .clock-legend .am { background: #fff3d6; color: #8a6a1c; }
+    .clock-legend .pm { background: #e3eaf6; color: #3d5686; }
+    .clock-hint { color: var(--muted); text-align: center; font-size: 11px; }
+    .equip-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+    .equip-bar { height: 7px; border-radius: 99px; background: #e6ebe6; overflow: hidden; margin: 4px 0 12px; }
+    .equip-bar > span { display: block; height: 100%; background: #e4ad55; }
+    .equip-loan { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid #edf0ec; }
+    .equip-loan .person-info { flex: 1; }
+    .equip-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
     .toast { position: fixed; right: 24px; bottom: 24px; z-index: 80; max-width: min(370px, calc(100vw - 32px)); padding: 12px 16px; background: #1d3831; color: white; border-radius: 8px; box-shadow: var(--shadow); font-size: 12px; opacity: 0; transform: translateY(8px); pointer-events: none; transition: .2s ease; }
     .toast.show { opacity: 1; transform: translateY(0); }
     .auth-gate { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom)); overflow-y: auto; overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; background: var(--page); }
@@ -310,6 +321,7 @@
         <button class="nav-item active" data-page="home"><span class="nav-icon">⌂</span>ホーム</button>
         <button class="nav-item" data-page="calendar"><span class="nav-icon">▦</span>カレンダー</button>
         <button class="nav-item" data-page="library"><span class="nav-icon">♫</span>楽譜・音源</button>
+        <button class="nav-item" data-page="equipment"><span class="nav-icon">♩</span>備品貸出</button>
       </nav>
       <div class="nav-divider"></div>
       <div class="nav-label">連絡フォーム</div>
@@ -383,7 +395,7 @@
         { id: 'song-5', title: '銀河鉄道999', byline: 'タケカワ ユキヒデ / 樽屋 雅徳 編曲', sortKey: 'Galaxy Express 999', drive: 'https://drive.google.com/', youtube: 'https://www.youtube.com/results?search_query=Galaxy+Express+999+wind+orchestra' }
       ]
     };
-    const emptyWorkspace = () => ({ isAdmin: false, schoolId: null, schoolName: '', clubName: '', inviteCode: '', userName: '', userId: null, groups: [], theme: { page: '#f3f5ef', ink: '#19332f', font: 'DM Sans' }, events: [], notices: [], absences: [], meters: [], equipment: [], lost: null, requests: [], members: [], songs: [] });
+    const emptyWorkspace = () => ({ isAdmin: false, schoolId: null, schoolName: '', clubName: '', inviteCode: '', userName: '', userId: null, groups: [], theme: { page: '#f3f5ef', ink: '#19332f', font: 'DM Sans' }, events: [], notices: [], absences: [], equipmentItems: [], equipmentLoans: [], lost: null, requests: [], members: [], songs: [] });
     let data = emptyWorkspace();
     let currentSession = null;
     let currentProfile = null;
@@ -399,8 +411,9 @@
     let selectedDate = dayKey(new Date());
     let selectedReason = '体調不良';
     let absenceKind = '欠席';
-    let clockHour = 4;
-    let clockPeriod = '午後';
+    let arrivalHour = null;
+    let arrivalMinute = null;
+    let clockStep = 'hour';
     let toastTimer;
     let deferredInstallPrompt = null;
     const content = document.getElementById('content');
@@ -525,14 +538,15 @@
       const schoolData = schoolRows.find(item => item.id === schoolId);
       if (!schoolData) throw new Error('所属団体の情報を取得できません。');
       data.schoolId = schoolId;
-      const [members, scheduleRows, reports, songRows, announcementRows, settingsData, equipmentRows] = await Promise.all([
+      const [members, scheduleRows, reports, songRows, announcementRows, settingsData, equipmentItemRows, equipmentLoanRows] = await Promise.all([
         readRows(supabaseClient.from('school_memberships').select('user_id, school_id, full_name, part, grade, grade_as_of, is_admin').eq('school_id', schoolId).order('full_name'), 'school_memberships'),
         readRows(supabaseClient.from('schedules').select('id, title, content, starts_at, ends_at, location').eq('school_id', schoolId).order('starts_at'), 'schedules'),
         readRows(supabaseClient.from('reports').select('id, reporter_id, kind, report_date, title, reason, arrival_at, photo_url, status, created_at').eq('school_id', schoolId).order('created_at', { ascending: false }), 'reports'),
         readRows(supabaseClient.from('songs').select('id, title, sort_reading, composer, arranger, drive_url, youtube_url, audio_file_path').eq('school_id', schoolId), 'songs'),
         readRows(supabaseClient.from('announcements').select('id, title, body, created_at').eq('school_id', schoolId).order('created_at', { ascending: false }), 'announcements'),
         readOptionalRow(supabaseClient.from('club_settings').select('theme_page, theme_ink, theme_font').eq('school_id', schoolId).maybeSingle(), 'club_settings'),
-        readRows(supabaseClient.from('equipment').select('id, name, borrower_id, borrowed_at, borrower_part').eq('school_id', schoolId).order('name'), 'equipment')
+        readRows(supabaseClient.from('equipment_items').select('id, name, total_count').eq('school_id', schoolId).order('name'), 'equipment_items'),
+        readRows(supabaseClient.from('equipment_loans').select('id, item_id, borrower_id, borrower_part, quantity, borrowed_at').eq('school_id', schoolId).is('returned_at', null).order('borrowed_at'), 'equipment_loans')
       ]);
       if (sequence !== loadSequence) return;
       const reportsForView = await Promise.all(reports.map(async report => {
@@ -560,8 +574,8 @@
         songs: songRows.map(item => ({ id: item.id, title: item.title, byline: [item.composer, item.arranger && `${item.arranger} 編曲`].filter(Boolean).join(' / '), sortKey: item.sort_reading, drive: item.drive_url, youtube: item.youtube_url, audioKey: item.audio_file_path })),
         notices: announcementRows.map(item => ({ id: item.id, title: item.title, body: item.body, date: japanDateKey(item.created_at), mark: '♪' })),
         theme: settingsData ? { page: settingsData.theme_page, ink: settingsData.theme_ink, font: settingsData.theme_font } : { page: '#f3f5ef', ink: '#19332f', font: 'DM Sans' },
-        equipment: equipmentRows,
-        meters: equipmentRows.map(item => ({ id: item.id, name: item.name, borrowed: Boolean(item.borrower_id), part: item.borrower_part || '', status: item.borrower_id ? `貸出中 · ${item.borrower_part || '部員'}` : '貸出できます' })),
+        equipmentItems: equipmentItemRows,
+        equipmentLoans: equipmentLoanRows,
         lost: { title: '落とし物の報告はありません', body: '', image: '', date: dayKey(new Date()) }
       };
       const lostReport = reportsForView.find(item => item.kind === 'lost_found' && item.status !== 'rejected');
@@ -601,7 +615,7 @@
         }, 180);
       };
       const channel = supabaseClient.channel(`school:${schoolId}`);
-      for (const table of ['profiles', 'schedules', 'reports', 'songs', 'announcements', 'club_settings', 'equipment']) {
+      for (const table of ['profiles', 'schedules', 'reports', 'songs', 'announcements', 'club_settings', 'equipment_items', 'equipment_loans']) {
         channel.on('postgres_changes', { event: '*', schema: 'public', table, filter: `school_id=eq.${schoolId}` }, refresh);
       }
       channel.on('postgres_changes', { event: '*', schema: 'public', table: 'school_memberships', filter: `user_id=eq.${currentSession.user.id}` }, refresh);
@@ -652,7 +666,7 @@
     }
     const setActiveNav = page => {
       document.querySelectorAll('.nav-item[data-page]').forEach(item => item.classList.toggle('active', item.dataset.page === page));
-      const labels = { home: 'ホーム', calendar: 'カレンダー', library: '楽譜・音源', admin: '管理者画面' };
+      const labels = { home: 'ホーム', calendar: 'カレンダー', library: '楽譜・音源', equipment: '備品貸出', admin: '管理者画面' };
       document.getElementById('crumbTitle').textContent = labels[page] || 'ホーム';
     };
     function render() {
@@ -677,19 +691,20 @@
       if (activePage === 'home') renderHome();
       if (activePage === 'calendar') renderCalendar();
       if (activePage === 'library') renderLibrary();
+      if (activePage === 'equipment') renderEquipment();
       if (activePage === 'admin') data.isAdmin ? renderAdmin() : (activePage = 'home', render());
     }
     function renderHome() {
       const todayKey = dayKey(new Date());
       const todayEvent = data.events.find(event => event.date === todayKey);
       const todayAbsences = data.absences.filter(item => item.date === todayKey);
-      const available = data.meters.filter(item => !item.borrowed).length;
+      const loanedCount = data.equipmentLoans.reduce((sum, loan) => sum + loan.quantity, 0);
       content.innerHTML = `
         <div class="welcome-row"><div><div class="eyebrow">${escapeHtml(dateLabel(todayKey))}</div><h1>${japanGreeting()}、${escapeHtml(data.userName)}さん</h1><div class="subheading">${escapeHtml(data.schoolName)} · ${escapeHtml(data.clubName)}</div></div><button class="primary-button" data-form="absence">＋　連絡</button></div>
         <div class="grid stats-grid">
           <div class="stat-card"><div class="stat-top">今日の部員 <span class="stat-symbol">♧</span></div><div class="stat-number">${Math.max(data.members.length-todayAbsences.length,0)}<span style="font-size:13px;font-weight:500"> / ${data.members.length}</span></div><div class="stat-foot">出席予定</div></div>
           <div class="stat-card"><div class="stat-top">今日の欠席・遅刻 <span class="stat-symbol" style="background:#fff0e9;color:#b56a4c">◷</span></div><div class="stat-number">${todayAbsences.length}<span style="font-size:13px;font-weight:500"> 名</span></div><div class="stat-foot">事前連絡を含む</div></div>
-          <div class="stat-card"><div class="stat-top">貸出可能 <span class="stat-symbol" style="background:#fff5da;color:#9a782c">♩</span></div><div class="stat-number">${available}<span style="font-size:13px;font-weight:500"> 台</span></div><div class="stat-foot">メトロノーム</div></div>
+          <div class="stat-card"><div class="stat-top">貸出中の備品 <span class="stat-symbol" style="background:#fff5da;color:#9a782c">♩</span></div><div class="stat-number">${loanedCount}<span style="font-size:13px;font-weight:500"> 点</span></div><div class="stat-foot">${data.equipmentItems.length}種類の備品</div></div>
           <div class="stat-card"><div class="stat-top">未確認の連絡 <span class="stat-symbol" style="background:#fcece8;color:#b75f4c">✉</span></div><div class="stat-number">${data.requests.filter(item => item.status === '確認待ち').length}<span style="font-size:13px;font-weight:500"> 件</span></div><div class="stat-foot">運営チームが確認します</div></div>
         </div>
         <div class="grid home-grid">
@@ -700,10 +715,9 @@
           </div>
           <div class="stack">
             ${renderPushPanel()}
-            <section class="panel"><div class="panel-head"><div><div class="panel-title">部員招待コード</div><div class="panel-note">このコードを共有すると部員が参加できます</div></div></div><div class="panel-body"><div class="invite-code">${escapeHtml(data.inviteCode || '未設定')}</div>${data.inviteCode ? '<button class="secondary-button" style="margin-top:10px" data-action="copy-invite-code">コードをコピー</button>' : ''}</div></section>
-            <section class="panel"><div class="panel-head"><div><div class="panel-title">メトロノーム</div><div class="panel-note">貸出状況</div></div><span class="panel-note">${available} / ${data.meters.length}台 空き</span></div><div class="panel-body">${data.meters.map(item => `<button type="button" class="meter-row ${item.borrowed ? 'borrowed' : ''}" data-action="borrow-metro" data-id="${escapeHtml(item.id)}"><div class="meter-icon">♩</div><div class="meter-info"><div class="meter-name">${escapeHtml(item.name)}</div><div class="meter-status">${escapeHtml(item.status)}${item.borrowed ? '' : ' <span class="meter-hint">· タップして借りる</span>'}</div></div><span class="status-dot" style="background:${item.borrowed ? '#e4ad55' : '#67a884'}"></span></button>`).join('')}</div></section>
             <section class="panel"><div class="panel-head"><div><div class="panel-title">落とし物のお知らせ</div><div class="panel-note">心当たりはありませんか？</div></div><button class="quiet-button" data-form="lost">報告する</button></div><div class="panel-body"><div class="lost-feature"><img class="lost-image" src="${escapeHtml(data.lost.image)}" alt="${escapeHtml(data.lost.title)}" onerror="this.src='https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=440&q=80'"><div><div class="lost-title">${escapeHtml(data.lost.title)}</div><div class="lost-copy">${escapeHtml(data.lost.body)}</div><div class="lost-date">${escapeHtml(dateLabel(data.lost.date))}</div></div></div></div></section>
             <section class="panel"><div class="panel-head"><div><div class="panel-title">今週の予定</div><div class="panel-note">次の合奏まであと少し</div></div></div><div class="panel-body">${data.events.filter(item => item.date >= todayKey).slice(0,3).map(item => `<div class="detail-row"><div class="detail-time">${escapeHtml(new Date(`${item.date}T12:00:00`).getDate())}日</div><div class="person-info"><div class="person-name">${escapeHtml(item.title)}</div><div class="person-detail">${escapeHtml(item.time)} · ${escapeHtml(item.place)}</div></div></div>`).join('') || '<div class="empty-state">予定はありません。</div>'}</div></section>
+            <section class="panel"><div class="panel-head"><div><div class="panel-title">部員招待コード</div><div class="panel-note">このコードを共有すると部員が参加できます</div></div></div><div class="panel-body"><div class="invite-code">${escapeHtml(data.inviteCode || '未設定')}</div>${data.inviteCode ? '<button class="secondary-button" style="margin-top:10px" data-action="copy-invite-code">コードをコピー</button>' : ''}</div></section>
           </div>
         </div>`;
     }
@@ -851,48 +865,6 @@ function renderAdmin() {
 
           </div></section>
           
-          <!-- ⏱️ ここにメトロノーム管理パネルが綺麗に入ります -->
-          <section class="panel">
-            <div class="panel-head">
-              <div>
-                <div class="panel-title">⏱️ メトロノーム貸出管理</div>
-                <div class="panel-note">現在の貸出状況と最大数の管理</div>
-              </div>
-            </div>
-            <div class="panel-body">
-              <div style="display: flex; gap: 12px; align-items: flex-end; margin-bottom: 20px;">
-                <div class="field" style="margin: 0; flex: 1;">
-                  <label for="metroMaxCount">メトロノームの最大所有数</label>
-                  <input id="metroMaxCount" type="number" min="0" value="${(data.equipment || []).filter(e => e.name.startsWith('メトロノーム')).length || 0}" placeholder="例: 5">
-                </div>
-                <button class="primary-button" data-action="save-metro-max" style="white-space: nowrap;">上限数を適用</button>
-              </div>
-
-              <div class="request-list">
-                <div class="panel-note" style="margin-bottom: 8px;">貸出中・申請中の一覧</div>
-                ${(data.equipment || []).filter(e => e.name.startsWith('メトロノーム') && e.borrower_id).length ? 
-                  (data.equipment || []).filter(e => e.name.startsWith('メトロノーム') && e.borrower_id).map(item => {
-                    const borrower = data.members.find(m => m.id === item.borrower_id) || { name: '不明な部員' };
-                    return `
-                      <div class="request-row">
-                        <div>
-                          <div class="request-title">${escapeHtml(item.name)}</div>
-                          <div class="request-meta">
-                            <span>パート: <strong>${escapeHtml(item.borrower_part || '未入力')}</strong></span><span>·</span><span>借用者: ${escapeHtml(borrower.name)}</span>
-                            <span>·</span>
-                            <span>貸出日: ${escapeHtml((item.borrowed_at ? dateLabel(japanDateKey(item.borrowed_at)) : '-'))}</span>
-                          </div>
-                        </div>
-                        <div class="inline-actions">
-                          <button class="danger-button" data-action="return-metro" data-id="${item.id}">返却処理 (消去)</button>
-                        </div>
-                      </div>
-                    `;
-                  }).join('') : '<div class="empty-state">現在貸出中のメトロノームはありません。</div>'
-                }
-              </div>
-            </div>
-          </section>
 
         </div></div>`;
 
@@ -1126,34 +1098,77 @@ function renderAdmin() {
       await loadWorkspace(currentSession.user);
       showToast('保存しました');
     }
-    function openMetroBorrow(meter) {
+    const equipmentFree = item => item.total_count - data.equipmentLoans.filter(loan => loan.item_id === item.id).reduce((sum, loan) => sum + loan.quantity, 0);
+    function renderEquipment() {
+      const memberName = id => data.members.find(member => member.id === id)?.name || '不明な部員';
+      const cards = data.equipmentItems.map(item => {
+        const loans = data.equipmentLoans.filter(loan => loan.item_id === item.id);
+        const out = loans.reduce((sum, loan) => sum + loan.quantity, 0);
+        const free = item.total_count - out;
+        const percent = item.total_count ? Math.round(out / item.total_count * 100) : 0;
+        const loanRows = loans.map(loan => `<div class="equip-loan"><div class="person-info"><div class="person-name">${escapeHtml(memberName(loan.borrower_id))} · ${loan.quantity}個</div><div class="person-detail">${escapeHtml(loan.borrower_part || 'パート未入力')} · ${escapeHtml(dateLabel(japanDateKey(loan.borrowed_at)))}</div></div>${loan.borrower_id === data.userId || data.isAdmin ? `<button class="secondary-button" data-action="equip-return" data-loan-id="${escapeHtml(loan.id)}">返却</button>` : ''}</div>`).join('');
+        return `<section class="panel equip-card"><div class="panel-head"><div><div class="panel-title">${escapeHtml(item.name)}</div><div class="panel-note">空き ${free} / 全${item.total_count}個</div></div></div><div class="panel-body"><div class="equip-bar"><span style="width:${percent}%"></span></div>${loanRows || '<div class="panel-note">貸出中はありません。</div>'}<div class="equip-actions"><button class="primary-button" data-action="equip-borrow" data-item-id="${escapeHtml(item.id)}" ${free < 1 ? 'disabled' : ''}>借りる</button>${data.isAdmin ? `<button class="secondary-button" data-action="equip-edit" data-item-id="${escapeHtml(item.id)}">編集</button><button class="danger-button" data-action="equip-delete" data-item-id="${escapeHtml(item.id)}">削除</button>` : ''}</div></div></section>`;
+      }).join('');
+      content.innerHTML = `<div class="welcome-row"><div><div class="eyebrow">EQUIPMENT</div><h1>備品貸出</h1><div class="subheading">部の備品を、誰がいくつ借りているか一目でわかります。</div></div>${data.isAdmin ? '<button class="primary-button" data-action="equip-add">＋　備品を追加</button>' : ''}</div><div class="equip-grid">${cards || `<div class="empty-state">${data.isAdmin ? '備品がまだありません。「＋ 備品を追加」から、備品名と持っている個数を登録してください。' : '備品はまだ登録されていません。'}</div>`}</div>`;
+    }
+    function openEquipmentItemModal(item = null) {
+      openModal(item ? '備品を編集' : '備品を追加', `<form id="equipItemForm" data-id="${item ? escapeHtml(item.id) : ''}" class="field-grid"><div class="field full"><label for="equipName">備品名</label><input id="equipName" required maxlength="40" autocomplete="off" value="${item ? escapeHtml(item.name) : ''}" placeholder="例：譜面台、メトロノーム"></div><div class="field full"><label for="equipTotal">持っている個数</label><input id="equipTotal" type="number" inputmode="numeric" min="1" max="9999" required value="${item ? item.total_count : ''}" placeholder="例：20"></div><div class="field full"><div class="modal-footer"><button type="button" class="secondary-button" data-action="close-modal">キャンセル</button><button type="submit" class="primary-button">${item ? '変更を保存' : '追加する'}</button></div></div></form>`);
+      document.getElementById('equipName')?.focus();
+    }
+    function openEquipmentBorrow(item) {
+      const free = equipmentFree(item);
       const defaultPart = ((data.groups || []).find(group => group.id === data.schoolId)?.part || '').split(' / ')[0];
-      openModal(`${escapeHtml(meter.name)}を借りる`, `<form id="metroBorrowForm" data-id="${escapeHtml(meter.id)}" data-name="${escapeHtml(meter.name)}" class="field-grid"><div class="field full"><label for="metroPart">借りるパート</label><input id="metroPart" required maxlength="40" autocomplete="off" value="${escapeHtml(defaultPart)}" placeholder="例：トランペット"></div><div class="field full"><button class="primary-button" type="submit">借りる</button></div></form>`);
-      const input = document.getElementById('metroPart');
-      if (input) input.focus();
+      openModal(`${escapeHtml(item.name)}を借りる`, `<form id="equipBorrowForm" data-id="${escapeHtml(item.id)}" data-name="${escapeHtml(item.name)}" class="field-grid"><div class="field"><label for="equipQty">借りる個数（最大${free}個）</label><input id="equipQty" type="number" inputmode="numeric" min="1" max="${free}" required value="1"></div><div class="field"><label for="equipPart">パート</label><input id="equipPart" required maxlength="40" autocomplete="off" value="${escapeHtml(defaultPart)}" placeholder="例：トランペット"></div><div class="field full"><div class="modal-footer"><button type="button" class="secondary-button" data-action="close-modal">キャンセル</button><button type="submit" class="primary-button">借りる</button></div></div></form>`);
     }
     function openGroupSwitcher() {
       const options = (data.groups || []).map(group => `<button type="button" class="group-picker-item ${group.id===data.schoolId?'active':''}" data-action="switch-group" data-school-id="${escapeHtml(group.id)}"><span class="club-avatar">${escapeHtml(initials(group.schoolName))}</span><span><strong>${escapeHtml(group.clubName)}</strong><br><span class="panel-note">${escapeHtml(group.schoolName)} · ${group.isAdmin?'管理者':'部員'}</span></span></button>`).join('');
       openModal('所属グループを選択', `<div class="group-picker">${options || '<div class="empty-state">参加中の団体はありません。</div>'}</div><div class="nav-divider"></div><form id="joinGroupForm" class="field-grid"><div class="field full"><label for="joinGroupInviteCode">別の団体に参加</label><input id="joinGroupInviteCode" name="inviteCode" autocomplete="off" autocapitalize="characters" minlength="12" maxlength="12" pattern="[A-Fa-f0-9]{12}" placeholder="12桁の招待コード" required></div><div class="field full"><button type="submit" class="secondary-button">＋ グループに参加</button></div></form>`);
     }
     function formMarkup(type) {
-      if (type === 'absence') return `<form id="absenceForm"><div class="field"><label>連絡内容</label><div class="reason-options"><button type="button" class="reason-option kind-option ${absenceKind==='欠席'?'selected':''}" data-kind="欠席">欠席</button><button type="button" class="reason-option kind-option ${absenceKind==='遅刻'?'selected':''}" data-kind="遅刻">遅刻</button></div></div><div class="field" style="margin-top:15px"><label>理由</label><div class="reason-options" id="reasonOptions">${['他部活への参加','家の用事','習い事','体調不良','公欠','その他'].map(reason => `<button type="button" class="reason-option ${reason===selectedReason?'selected':''}" data-reason="${reason}">${reason}</button>`).join('')}</div></div><div class="field" style="margin-top:17px"><label>対象日</label><input name="date" type="date" required value="${dayKey(new Date())}"></div><div class="field" id="arrivalField" style="margin-top:17px" ${absenceKind==='遅刻'?'':'hidden'}><label>到着予定時刻</label><div class="clock-controls"><div class="clock-dial" id="clockDial"><div class="clock-hand" id="clockHand"></div><div class="clock-center"></div></div><div class="ampm"><button type="button" class="${clockPeriod==='午前'?'selected':''}" data-period="午前">午前</button><button type="button" class="${clockPeriod==='午後'?'selected':''}" data-period="午後">午後</button></div></div><div class="clock-hint" id="clockHint">${clockPeriod} ${clockHour}:00 頃に到着予定</div></div><div class="field" style="margin-top:16px"><label for="absenceNote">補足</label><textarea id="absenceNote" placeholder="必要な連絡があれば入力してください"></textarea></div><div class="modal-footer"><button type="button" class="secondary-button" data-action="close-modal">キャンセル</button><button type="submit" class="primary-button">連絡を送信</button></div></form>`;
+      if (type === 'absence') return `<form id="absenceForm"><div class="field"><label>連絡内容</label><div class="reason-options"><button type="button" class="reason-option kind-option ${absenceKind==='欠席'?'selected':''}" data-kind="欠席">欠席</button><button type="button" class="reason-option kind-option ${absenceKind==='遅刻'?'selected':''}" data-kind="遅刻">遅刻</button></div></div><div class="field" style="margin-top:15px"><label>理由</label><div class="reason-options" id="reasonOptions">${['他部活への参加','家の用事','習い事','体調不良','公欠','その他'].map(reason => `<button type="button" class="reason-option ${reason===selectedReason?'selected':''}" data-reason="${reason}">${reason}</button>`).join('')}</div></div><div class="field" style="margin-top:17px"><label>対象日</label><input name="date" type="date" required value="${dayKey(new Date())}"></div><div class="field" id="arrivalField" style="margin-top:17px" ${absenceKind==='遅刻'?'':'hidden'}><label>到着予定時刻</label><div class="clock-area" id="clockArea"></div></div><div class="field" style="margin-top:16px"><label for="absenceNote">補足</label><textarea id="absenceNote" placeholder="必要な連絡があれば入力してください"></textarea></div><div class="modal-footer"><button type="button" class="secondary-button" data-action="close-modal">キャンセル</button><button type="submit" class="primary-button">連絡を送信</button></div></form>`;
       if (type === 'purchase') return `<form id="purchaseForm" class="field-grid"><div class="field full"><label for="purchaseTitle">希望する物品・修理</label><input id="purchaseTitle" required placeholder="例：譜面台の修理"></div><div class="field"><label for="purchaseCategory">種類</label><select id="purchaseCategory"><option>購入希望</option><option>修理希望</option></select></div><div class="field"><label for="purchaseUrgency">希望時期</label><select id="purchaseUrgency"><option>急ぎではない</option><option>なるべく早く</option><option>今週中</option></select></div><div class="field full"><label for="purchaseBody">詳細</label><textarea id="purchaseBody" placeholder="数量、状態、必要な理由など"></textarea></div><div class="field full"><div class="modal-footer"><button type="button" class="secondary-button" data-action="close-modal">キャンセル</button><button type="submit" class="primary-button">希望を送信</button></div></div></form>`;
       return `<form id="lostForm" class="field-grid"><div class="field full"><label for="lostTitle">落とし物・拾得物</label><input id="lostTitle" required placeholder="例：黒い譜面ファイル"></div><div class="field full"><label for="lostPlace">場所・状況</label><textarea id="lostPlace" placeholder="見つけた場所、特徴など"></textarea></div><div class="field full"><label for="lostPhoto">写真を添付</label><input id="lostPhoto" type="file" accept="image/*"><img id="lostPreview" alt="写真プレビュー" style="display:none;max-width:100%;max-height:180px;object-fit:contain;border-radius:8px"></div><div class="field full"><div class="modal-footer"><button type="button" class="secondary-button" data-action="close-modal">キャンセル</button><button type="submit" class="primary-button">報告を送信</button></div></div></form>`;
+    }
+    function clockLabel(hour, minute) {
+      if (hour === null) return '時刻を選んでください';
+      const h12 = hour === 0 ? 0 : (hour % 12 || 12);
+      const base = `${hour < 12 ? '午前' : '午後'}${h12}時`;
+      if (minute === null) return `${base}（分を選んでください）`;
+      const mm = String(minute).padStart(2, '0');
+      return `${base}${mm}分（${String(hour).padStart(2, '0')}:${mm}）頃に到着予定`;
+    }
+    function renderClock() {
+      const area = document.getElementById('clockArea');
+      if (!area) return;
+      const C = 125;
+      const place = (label, radius, degree, attr, selected) => {
+        const rad = (degree - 90) * Math.PI / 180;
+        return `<button type="button" class="clock-number ${selected ? 'selected' : ''}" ${attr} style="left:${(C + Math.cos(rad) * radius).toFixed(1)}px;top:${(C + Math.sin(rad) * radius).toFixed(1)}px">${label}</button>`;
+      };
+      const numbers = [];
+      let handAngle = null, handLength = 0;
+      if (clockStep === 'hour') {
+        for (let n = 1; n <= 12; n++) numbers.push(place(n, 102, (n % 12) * 30, `data-clock-hour="${n}"`, arrivalHour === n));
+        for (let n = 13; n <= 24; n++) numbers.push(place(n, 64, (n % 12) * 30, `data-clock-hour="${n % 24}"`, arrivalHour === n % 24));
+        if (arrivalHour !== null) { handAngle = (arrivalHour % 12) * 30; handLength = arrivalHour >= 1 && arrivalHour <= 12 ? 102 : 64; }
+      } else {
+        for (let m = 0; m < 60; m += 5) numbers.push(place(String(m).padStart(2, '0'), 100, m * 6, `data-clock-minute="${m}"`, arrivalMinute === m));
+        if (arrivalMinute !== null) { handAngle = arrivalMinute * 6; handLength = 100; }
+      }
+      const hand = handAngle === null ? '' : `<div class="clock-hand" style="height:${handLength}px;transform:rotate(${handAngle}deg)"></div>`;
+      area.innerHTML = `<div class="clock-step">${clockStep === 'hour' ? '① 何時ごろに着きますか？' : '② 何分ですか？（5分単位）'}</div>`
+        + `<div class="clock-dial ${clockStep === 'hour' ? 'hour-mode' : ''}">${clockStep === 'hour' ? '<div class="clock-inner"></div>' : ''}${hand}<div class="clock-center"></div>${numbers.join('')}</div>`
+        + (clockStep === 'hour'
+          ? '<div class="clock-legend"><span class="am">外側：午前（1〜12）</span><span class="pm">内側：午後（13〜24）</span></div>'
+          : '<button type="button" class="quiet-button" data-clock-action="back">← 時を選び直す</button>')
+        + `<div class="clock-hint">${escapeHtml(clockLabel(arrivalHour, arrivalMinute))}</div>`;
     }
     function openAbsence() {
       selectedReason = '体調不良';
       absenceKind = '欠席';
+      arrivalHour = null; arrivalMinute = null; clockStep = 'hour';
       openModal('遅刻・欠席連絡', formMarkup('absence'));
-      const dial = document.getElementById('clockDial');
-      for (let hour=1; hour<=12; hour++) {
-        const angle = (hour*30-90)*Math.PI/180, radius=72;
-        const button = document.createElement('button'); button.type='button'; button.className=`clock-number ${hour===clockHour?'selected':''}`; button.textContent=hour;
-        button.style.left=`${95+Math.cos(angle)*radius}px`; button.style.top=`${95+Math.sin(angle)*radius}px`;
-        button.addEventListener('click', () => { clockHour=hour; dial.querySelectorAll('.clock-number').forEach(item=>item.classList.toggle('selected', Number(item.textContent)===hour)); document.getElementById('clockHand').style.transform=`rotate(${hour*30}deg)`; document.getElementById('clockHint').textContent=`${clockPeriod} ${hour}:00 頃に到着予定`; });
-        dial.appendChild(button);
-      }
-      document.getElementById('clockHand').style.transform=`rotate(${clockHour*30}deg)`;
+      renderClock();
       document.getElementById('arrivalField').hidden = absenceKind !== '遅刻';
     }
     function openSongModal(song = null) {
@@ -1208,11 +1223,26 @@ function renderAdmin() {
       if (target.dataset.action === 'history-edit') { historyState.editing = { kind: target.dataset.kind, id: target.dataset.id }; renderHistory(); return; }
       if (target.dataset.action === 'history-back') { historyState.editing = null; renderHistory(); return; }
       if (target.dataset.action === 'history-delete') { deleteHistoryItem(target.dataset.kind, target.dataset.id).catch(showDatabaseError); return; }
-      if (target.dataset.action === 'borrow-metro') {
-        const meter = data.meters.find(item => item.id === target.dataset.id);
-        if (!meter) return;
-        if (meter.borrowed) showToast(`${meter.name}は${meter.part || '他の部員'}が借りています`);
-        else openMetroBorrow(meter);
+      if (target.dataset.action === 'equip-add') { openEquipmentItemModal(); return; }
+      if (target.dataset.action === 'equip-edit') { const item = data.equipmentItems.find(entry => entry.id === target.dataset.itemId); if (item) openEquipmentItemModal(item); return; }
+      if (target.dataset.action === 'equip-borrow') { const item = data.equipmentItems.find(entry => entry.id === target.dataset.itemId); if (item) openEquipmentBorrow(item); return; }
+      if (target.dataset.action === 'equip-return') {
+        (async () => {
+          const { error } = await supabaseClient.rpc('return_equipment_loan', { p_loan_id: target.dataset.loanId });
+          if (error) throw error;
+          await loadWorkspace(currentSession.user);
+          showToast('返却しました');
+        })().catch(showDatabaseError);
+        return;
+      }
+      if (target.dataset.action === 'equip-delete') {
+        const item = data.equipmentItems.find(entry => entry.id === target.dataset.itemId);
+        if (!item || !window.confirm(`「${item.name}」を削除しますか？貸出の記録もすべて消えます。`)) return;
+        (async () => {
+          checkedData(await supabaseClient.from('equipment_items').delete().eq('id', item.id).eq('school_id', data.schoolId).select('id'));
+          await loadWorkspace(currentSession.user);
+          showToast('備品を削除しました');
+        })().catch(showDatabaseError);
         return;
       }
       if (target.dataset.page) { activePage=target.dataset.page; render(); closeDrawer(); return; }
@@ -1220,7 +1250,9 @@ function renderAdmin() {
       if (target.dataset.action === 'close-modal') { closeModal(); return; }
       if (target.dataset.kind) { absenceKind=target.dataset.kind; document.querySelectorAll('.kind-option').forEach(item=>item.classList.toggle('selected',item.dataset.kind===absenceKind)); document.getElementById('arrivalField').hidden=absenceKind!=='遅刻'; return; }
       if (target.dataset.reason) { selectedReason=target.dataset.reason; document.querySelectorAll('#reasonOptions .reason-option').forEach(item=>item.classList.toggle('selected',item.dataset.reason===selectedReason)); const arrival = document.getElementById('arrivalField'); if(arrival) arrival.hidden=absenceKind!=='遅刻'; return; }
-      if (target.dataset.period) { clockPeriod=target.dataset.period; document.querySelectorAll('[data-period]').forEach(item=>item.classList.toggle('selected',item.dataset.period===clockPeriod)); document.getElementById('clockHint').textContent=`${clockPeriod} ${clockHour}:00 頃に到着予定`; return; }
+      if (target.dataset.clockHour !== undefined) { arrivalHour = Number(target.dataset.clockHour); arrivalMinute = null; clockStep = 'minute'; renderClock(); return; }
+      if (target.dataset.clockMinute !== undefined) { arrivalMinute = Number(target.dataset.clockMinute); renderClock(); return; }
+      if (target.dataset.clockAction === 'back') { clockStep = 'hour'; renderClock(); return; }
       if (target.dataset.month) { if(target.dataset.month==='today') calendarDate=new Date(); else calendarDate.setMonth(calendarDate.getMonth()+Number(target.dataset.month)); renderCalendar(); return; }
       if (target.classList.contains('calendar-day')) { selectedDate=target.dataset.date; renderCalendar(); return; }
       if (target.dataset.action==='request-status') { updateReportStatus(target.dataset.id, target.dataset.status).catch(showDatabaseError); return; }
@@ -1229,52 +1261,6 @@ function renderAdmin() {
       if (target.dataset.action==='delete-member') { deleteMember(target.dataset.id).catch(showDatabaseError); return; }
       if (target.dataset.action==='save-theme') { saveTheme().catch(showDatabaseError); return; }
       
-      // ⏱️ メトロノームの上限数を設定する（足りない分を equipment テーブルに自動生成・削除）
-      if (target.dataset.action === 'save-metro-max') {
-        (async () => {
-          const maxCount = parseInt(document.getElementById('metroMaxCount').value) || 0;
-          const currentMetros = (data.equipment || []).filter(e => e.name.startsWith('メトロノーム'));
-          
-          if (maxCount < currentMetros.length) {
-            // 減らす場合は、まだ誰も借りていない空きのメトロノームから優先的に削除
-            const toDelete = currentMetros.filter(e => !e.borrower_id).slice(0, currentMetros.length - maxCount);
-            for (const item of toDelete) {
-              const { error } = await supabaseClient.from('equipment').delete().eq('id', item.id);
-              if (error) throw error;
-            }
-          } else if (maxCount > currentMetros.length) {
-            // 増やす場合は、新規メトロノームレコードを不足分追加
-            const needed = maxCount - currentMetros.length;
-            const newRows = Array.from({ length: needed }, (_, i) => ({
-              school_id: data.schoolId,
-              name: `メトロノーム #${currentMetros.length + i + 1}`
-            }));
-            const { error } = await supabaseClient.from('equipment').insert(newRows);
-            if (error) throw error;
-          }
-          
-          await loadWorkspace(currentSession.user);
-          showToast('メトロノームの最大数を更新しました');
-        })().catch(showDatabaseError);
-        return;
-      }
-
-      // ⏱️ 管理者側から「返却」を受け付け、貸出データを空（リセット）にする
-      if (target.dataset.action === 'return-metro') {
-        (async () => {
-          const id = target.dataset.id;
-          const { error } = await supabaseClient.from('equipment').update({
-            borrower_id: null,
-            borrowed_at: null
-          }).eq('id', id);
-          if (error) throw error;
-          
-          await loadWorkspace(currentSession.user);
-          showToast('返却処理が完了しました');
-        })().catch(showDatabaseError);
-        return;
-      }
-
       if (target.dataset.action==='add-song') { openSongModal(); return; }
       if (target.dataset.action==='edit-song') { const song=data.songs.find(item=>item.id===target.dataset.id); if(song) openSongModal(song); return; }
       if (target.dataset.action==='play-song') { playSong(target.dataset.id); return; }
@@ -1352,15 +1338,34 @@ function renderAdmin() {
         try { await saveHistoryEdit(form); } catch (error) { showDatabaseError(error); }
         return;
       }
-      if (form.id === 'metroBorrowForm') {
+      if (form.id === 'equipItemForm') {
         try {
-          const part = document.getElementById('metroPart').value.trim();
+          const name = document.getElementById('equipName').value.trim();
+          const total = Number.parseInt(document.getElementById('equipTotal').value, 10);
+          if (!name || !Number.isInteger(total) || total < 1) throw new Error('備品名と、1以上の個数を入力してください。');
+          const id = form.dataset.id;
+          if (id) checkedData(await supabaseClient.from('equipment_items').update({ name, total_count: total }).eq('id', id).eq('school_id', data.schoolId).select('id'));
+          else checkedData(await supabaseClient.from('equipment_items').insert({ school_id: data.schoolId, name, total_count: total }).select('id'));
+          closeModal();
+          await loadWorkspace(currentSession.user);
+          showToast(id ? '備品を更新しました' : '備品を追加しました');
+        } catch (error) {
+          if (error?.code === '23505') showToast('同じ名前の備品がすでにあります。');
+          else showDatabaseError(error);
+        }
+        return;
+      }
+      if (form.id === 'equipBorrowForm') {
+        try {
+          const quantity = Number.parseInt(document.getElementById('equipQty').value, 10);
+          const part = document.getElementById('equipPart').value.trim();
+          if (!Number.isInteger(quantity) || quantity < 1) throw new Error('個数を入力してください。');
           if (!part) throw new Error('パートを入力してください。');
-          const { error } = await supabaseClient.rpc('borrow_equipment', { p_equipment_id: form.dataset.id, p_part: part });
+          const { error } = await supabaseClient.rpc('borrow_equipment_item', { p_item_id: form.dataset.id, p_quantity: quantity, p_part: part });
           if (error) throw error;
           closeModal();
           await loadWorkspace(currentSession.user);
-          showToast(`${form.dataset.name}を借りました`);
+          showToast(`${form.dataset.name}を${quantity}個借りました`);
         } catch (error) { showDatabaseError(error); }
         return;
       }
@@ -1440,8 +1445,8 @@ function renderAdmin() {
         if(form.id==='absenceForm') {
           const date=new FormData(form).get('date');
           const note=document.getElementById('absenceNote').value.trim();
-          const arrivalHour=clockHour%12+(clockPeriod==='午後'?12:0);
-          const arrivalAt=absenceKind==='遅刻'?`${String(arrivalHour).padStart(2,'0')}:00:00`:null;
+          if(absenceKind==='遅刻' && (arrivalHour===null || arrivalMinute===null)) { showToast('到着予定の時刻（時と分）を選んでください'); return; }
+          const arrivalAt=absenceKind==='遅刻'?`${String(arrivalHour).padStart(2,'0')}:${String(arrivalMinute).padStart(2,'0')}:00`:null;
           const title=absenceKind==='遅刻'?'練習に遅刻します':'練習を欠席します';
           const reason=`${selectedReason}${note?` · ${note}`:''}`;
           await requestEntry('absence',title,reason,date,arrivalAt);
