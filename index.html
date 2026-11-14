@@ -1156,12 +1156,12 @@ function renderAdmin() {
         if (arrivalMinute !== null) { handAngle = arrivalMinute * 6; handLength = 100; }
       }
       const hand = handAngle === null ? '' : `<div class="clock-hand" style="height:${handLength}px;transform:rotate(${handAngle}deg)"></div>`;
-      area.innerHTML = `<div class="clock-step">${clockStep === 'hour' ? '① 何時ごろに着きますか？' : '② 何分ですか？（5分単位）'}</div>`
+      area.innerHTML = ''
         + `<div class="clock-dial ${clockStep === 'hour' ? 'hour-mode' : ''}">${clockStep === 'hour' ? '<div class="clock-inner"></div>' : ''}${hand}<div class="clock-center"></div>${numbers.join('')}</div>`
         + (clockStep === 'hour'
-          ? '<div class="clock-legend"><span class="am">外側：午前（1〜12）</span><span class="pm">内側：午後（13〜24）</span></div>'
+          ? ''
           : '<button type="button" class="quiet-button" data-clock-action="back">← 時を選び直す</button>')
-        + `<div class="clock-hint">${escapeHtml(clockLabel(arrivalHour, arrivalMinute))}</div>`;
+        + `<div class="clock-hint">${arrivalHour === null ? '&nbsp;' : escapeHtml(clockLabel(arrivalHour, arrivalMinute))}</div>`;
     }
     function openAbsence() {
       selectedReason = '体調不良';
