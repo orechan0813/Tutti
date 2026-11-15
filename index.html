@@ -1480,7 +1480,9 @@ function renderAdmin() {
     }
     async function saveTheme() {
       const theme = { page: document.getElementById('themePage').value, ink: document.getElementById('themeInk').value, font: document.getElementById('themeFont').value };
-      checkedData(await supabaseClient.from('club_settings').upsert({ school_id: data.schoolId, theme_page: theme.page, theme_ink: theme.ink, theme_font: theme.font }, { onConflict: 'school_id' }));
+      const themeValues = { theme_page: theme.page, theme_ink: theme.ink, theme_font: theme.font };
+      const updatedSettings = checkedData(await supabaseClient.from('club_settings').update(themeValues).eq('school_id', data.schoolId).select('school_id'));
+      if (!updatedSettings.length) checkedData(await supabaseClient.from('club_settings').insert({ school_id: data.schoolId, ...themeValues }));
       data.theme = theme;
       render();
       showToast('団体のデザインを保存しました');
