@@ -868,11 +868,10 @@ function renderAdmin() {
                       </div>
                     </div>
                     <div class="inline-actions">
-                      <span class="request-state ${item.status==='対応済み'?'approved':item.status==='却下'?'rejected':''}">${escapeHtml(item.status)}</span>
-                      ${item.status==='確認待ち'?`
-                        <button class="secondary-button" data-action="request-status" data-id="${item.id}" data-status="対応済み">確認</button>
-                        <button class="danger-button" data-action="request-status" data-id="${item.id}" data-status="却下">却下</button>
-                      `:''}
+                      ${item.status==='確認待ち'
+                        ? `<button class="secondary-button" data-action="lost-delete" data-id="${item.id}">確認</button>`
+                        : `<span class="request-state ${item.status==='対応済み'?'approved':item.status==='却下'?'rejected':''}">${escapeHtml(item.status)}</span>
+                           <button class="danger-button" data-action="lost-delete" data-id="${item.id}">削除</button>`}
                     </div>
                   </div>
                 `).join('') : '<div class="empty-state">新しい落とし物報告はありません。</div>'
@@ -1436,6 +1435,7 @@ function renderAdmin() {
       }
       if (target.dataset.month) { if(target.dataset.month==='today') calendarDate=new Date(); else calendarDate.setMonth(calendarDate.getMonth()+Number(target.dataset.month)); renderCalendar(); return; }
       if (target.classList.contains('calendar-day')) { selectedDate=target.dataset.date; renderCalendar(); return; }
+      if (target.dataset.action==='lost-delete') { deleteLostReport(target.dataset.id).catch(showDatabaseError); return; }
       if (target.dataset.action==='request-status') { updateReportStatus(target.dataset.id, target.dataset.status).catch(showDatabaseError); return; }
       if (target.dataset.action==='member-role') { updateMemberRole(target.dataset.index).catch(showDatabaseError); return; }
       if (target.dataset.action==='edit-member') { const member=data.members[Number(target.dataset.index)]; if(member) openMemberModal(member); return; }
@@ -1471,6 +1471,23 @@ function renderAdmin() {
       checkedData(await supabaseClient.from('reports').update({ status }).eq('id', id).eq('school_id', data.schoolId));
       await loadWorkspace(currentSession.user);
       showToast(`投稿を「${reportStatusLabel(status)}」にしました`);
+    }
+    async function deleteLostReport(id) {
+      // 写真のパスを先に取得（行を消すと分からなくなるため）
+      const found = await supabaseClient.from('reports').select('photo_url')
+        .eq('id', id).eq('school_id', data.schoolId).eq('kind', 'lost_found').maybeSingle();
+      const photoPath = checkedData(found)?.photo_url || null;
+      // 行を削除（RLSで0件になった場合も検知するため select で返す）
+      const deleted = checkedData(await supabaseClient.from('reports').delete()
+        .eq('id', id).eq('school_id', data.schoolId).eq('kind', 'lost_found').select('id'));
+      if (!deleted || deleted.length === 0) throw new Error('削除できませんでした（権限がないか、すでに削除されています）');
+      // 写真も削除（失敗しても報告の削除は成功扱い）
+      if (photoPath) {
+        const removed = await supabaseClient.storage.from('report-photos').remove([photoPath]);
+        if (removed.error) console.warn('Could not remove lost-item photo', removed.error);
+      }
+      await loadWorkspace(currentSession.user);
+      showToast('確認して、落とし物の報告を削除しました');
     }
     async function updateMemberRole(index) {
       const member = data.members[Number(index)];
