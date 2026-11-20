@@ -776,12 +776,31 @@
         <div class="panel calendar"><div class="panel-head"><div class="month-switch"><button class="icon-button" data-month="-1" aria-label="前の月">‹</button><div class="month-title">${year}年 ${month+1}月</div><button class="icon-button" data-month="1" aria-label="次の月">›</button></div><button class="secondary-button" data-month="today">今日</button></div><div class="calendar-grid">${weekdays.map(day => `<div class="calendar-weekday">${day}</div>`).join('')}${dayCells}</div></div>
         <section class="panel calendar-detail"><div class="panel-head"><div><div class="panel-title">${escapeHtml(dateLabel(selectedDate))}の予定と出欠</div><div class="panel-note">${dateEvents.length ? '活動枠をタップすると詳細が開きます' : '過去の履歴・未来の欠席予定も確認できます'}</div></div></div><div class="panel-body">${dateEvents.map(item => expandedEventId === item.id ? practiceCardMarkup(item, { closeId: item.id }) : `<button type="button" class="detail-row event-toggle" data-action="toggle-event" data-id="${escapeHtml(item.id)}"><div class="detail-time">${escapeHtml(item.time || '—')}</div><div class="person-info"><div class="person-name">${escapeHtml(item.title)}</div><div class="person-detail">${escapeHtml([timeRangeLabel(item.time, item.endTime), item.place].filter(Boolean).join(' · '))}${item.items && item.items.length ? ` · タイムテーブル${item.items.length}件` : ''}</div></div><span class="panel-note">›</span></button>`).join('')}${dateAbsences.map(item => `<div class="detail-row"><div class="detail-time">${escapeHtml(item.name.split(' ')[0])}</div><div class="person-info"><div class="person-name">${escapeHtml(item.name)} · 欠席/遅刻</div><div class="person-detail">${escapeHtml(item.detail)}</div></div></div>`).join('')}${!dateEvents.length&&!dateAbsences.length?'<div class="detail-empty">この日の予定・連絡はありません。</div>':''}</div></section>`;
     }
+    // ===== 楽譜ライブラリ：頭文字ごとのカード（A〜Z + その他）=====
+    function songGroupKey(item) {
+      const raw = String(item.sortKey || item.title || '').normalize('NFKC').replace(/^[^A-Za-z0-9\u3040-\u30ff\u4e00-\u9fff]+/, '');
+      const ch = raw.charAt(0).toUpperCase();
+      return /^[A-Z]$/.test(ch) ? ch : 'その他';
+    }
+    function renderSongRow(item, index) {
+      return `<div class="song-row"><div class="song-index">${String(index+1).padStart(2,'0')}</div><div><div class="song-title">${escapeHtml(item.title)}</div><div class="song-byline">${escapeHtml(item.byline)}</div></div><div class="song-actions">${item.audioKey?`<button type="button" data-action="play-song" data-id="${escapeHtml(item.id)}" title="音源を再生" aria-label="音源を再生">▶</button>`:''}${safeHref(item.youtube)?`<a href="${escapeHtml(safeHref(item.youtube))}" target="_blank" rel="noopener noreferrer" title="YouTubeで開く" aria-label="YouTubeで開く">↗</a>`:''}${safeHref(item.drive)?`<a href="${escapeHtml(safeHref(item.drive))}" target="_blank" rel="noopener noreferrer" title="Google Driveの楽譜を開く" aria-label="楽譜を開く">楽譜</a>`:''}${data.isAdmin?`<button data-action="edit-song" data-id="${escapeHtml(item.id)}" title="曲を編集">✎</button>`:''}</div></div>`;
+    }
+    function renderSongGroups(songs) {
+      if (!songs.length) return '<section class="panel"><div class="empty-state">曲が見つかりませんでした。</div></section>';
+      const groups = new Map();
+      songs.forEach(item => { const key = songGroupKey(item); if (!groups.has(key)) groups.set(key, []); groups.get(key).push(item); });
+      const order = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'その他'];
+      return '<div class="stack">' + order.filter(key => groups.has(key)).map(key => {
+        const list = groups.get(key);
+        return `<section class="panel song-group"><div class="panel-head"><div><div class="panel-title">${key}</div><div class="panel-note">${list.length}曲</div></div></div><div class="song-list">${list.map((item, index) => renderSongRow(item, index)).join('')}</div></section>`;
+      }).join('') + '</div>';
+    }
     function renderLibrary(query = '') {
       const collator = new Intl.Collator('en', { sensitivity: 'base', numeric: true });
       const songs = data.songs.filter(item => `${item.title} ${item.byline}`.toLowerCase().includes(query.toLowerCase())).sort((a,b) => collator.compare(a.sortKey || a.title, b.sortKey || b.title));
       content.innerHTML = `<div class="welcome-row"><div><div class="eyebrow">MUSIC LIBRARY</div><h1>楽譜・音源</h1><div class="subheading">部のレパートリーを、いつでも手元に。</div></div>${data.isAdmin?'<button class="primary-button" data-action="add-song">＋　曲を追加</button>':''}</div>
         <div class="page-toolbar"><label class="search-box"><span>⌕</span><input id="songSearch" type="search" placeholder="曲名・作曲者で検索" value="${escapeHtml(query)}"></label><span class="panel-note">${songs.length} 曲 · A–Z順</span></div>
-        <section class="panel"><div class="panel-head"><div><div class="panel-title">レパートリー</div><div class="panel-note">曲名 · 作曲・編曲者</div></div></div><div class="song-list">${songs.map((item,index) => `<div class="song-row"><div class="song-index">${String(index+1).padStart(2,'0')}</div><div><div class="song-title">${escapeHtml(item.title)}</div><div class="song-byline">${escapeHtml(item.byline)}</div></div><div class="song-actions">${item.audioKey?`<button data-action="play-song" data-id="${escapeHtml(item.id)}" title="音源を再生" aria-label="音源を再生">▶</button>`:`<a href="${escapeHtml(item.youtube || '#')}" target="_blank" rel="noopener" title="YouTubeで参考音源を開く">▶</a>`}<a href="${escapeHtml(item.drive || '#')}" target="_blank" rel="noopener" title="Google Driveの楽譜を開く">↗</a>${data.isAdmin?`<button data-action="edit-song" data-id="${escapeHtml(item.id)}" title="曲を編集">✎</button>`:''}</div></div>`).join('')||'<div class="empty-state">曲が見つかりませんでした。</div>'}</div></section>`;
+        ${renderSongGroups(songs)}`;
       const search = document.getElementById('songSearch');
       if (search) search.addEventListener('input', event => { const position = event.target.selectionStart; renderLibrary(event.target.value); const next = document.getElementById('songSearch'); next.focus(); next.setSelectionRange(position,position); });
     }
@@ -1517,11 +1536,134 @@ function renderAdmin() {
       await loadWorkspace(currentSession.user);
       showToast('連絡を送信しました');
     }
+    // ===== 音源プレーヤー：下部バー / シーク / バックグラウンド再生 =====
+    function safeHref(url) { return /^https?:\/\//i.test(url || '') ? url : ''; }
+    const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+    const playerState = { audio: null, bar: null, songId: null, seeking: false };
+    function formatPlayTime(sec) {
+      if (!isFinite(sec) || sec < 0) sec = 0;
+      return `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
+    }
+    function updatePlayButtons() {
+      const audio = playerState.audio;
+      document.querySelectorAll('button[data-action="play-song"]').forEach(btn => {
+        const playing = Boolean(audio) && !audio.paused && btn.dataset.id === playerState.songId;
+        const mark = playing ? '⏸' : '▶';
+        if (btn.textContent !== mark) btn.textContent = mark;
+        btn.setAttribute('aria-label', playing ? '一時停止' : '音源を再生');
+      });
+    }
+    function ensurePlayer() {
+      if (playerState.audio) return playerState;
+      const style = document.createElement('style');
+      style.textContent = `
+        #playerBar { position: fixed; left: 252px; right: 0; bottom: 0; z-index: 45; padding: 10px 18px calc(10px + env(safe-area-inset-bottom, 0px)); background: #fff; border-top: 1px solid var(--line); box-shadow: 0 -6px 20px rgba(25,51,47,.10); display: grid; gap: 6px; }
+        #playerBar[hidden] { display: none; }
+        #playerBar .pb-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+        #playerBar .pb-title { font-size: 12px; font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        #playerBar .pb-row { display: flex; align-items: center; gap: 10px; }
+        #playerBar button { min-width: 38px; height: 38px; border: 1px solid var(--line); border-radius: 50%; background: #fff; color: var(--green); font-size: 14px; cursor: pointer; }
+        #playerBar .pb-close { min-width: 30px; height: 30px; font-size: 16px; color: var(--muted); }
+        #playerBar .pb-time { font-size: 10px; color: var(--muted); min-width: 34px; text-align: center; font-variant-numeric: tabular-nums; }
+        #playerBar .pb-seek { flex: 1; min-width: 0; height: 28px; accent-color: var(--green); cursor: pointer; }
+        body.has-player #content { padding-bottom: 110px; }
+        body.has-player .toast { bottom: 96px; }
+        @media (max-width: 1050px) { #playerBar { left: 226px; } }
+        @media (max-width: 760px) { #playerBar { left: 0; } }`;
+      document.head.appendChild(style);
+
+      const audio = document.createElement('audio');
+      audio.id = 'audioPlayer'; audio.preload = 'none'; audio.setAttribute('playsinline', ''); audio.hidden = true;
+      document.body.appendChild(audio);
+
+      const bar = document.createElement('div');
+      bar.id = 'playerBar'; bar.hidden = true;
+      bar.innerHTML = `
+        <div class="pb-top"><div class="pb-title"></div><button type="button" class="pb-close" data-action="player-close" aria-label="プレーヤーを閉じる">×</button></div>
+        <div class="pb-row">
+          <button type="button" class="pb-toggle" data-action="player-toggle" aria-label="再生／一時停止">▶</button>
+          <span class="pb-time pb-cur">0:00</span>
+          <input class="pb-seek" type="range" min="0" max="1000" step="1" value="0" aria-label="再生位置">
+          <span class="pb-time pb-dur">0:00</span>
+        </div>`;
+      document.body.appendChild(bar);
+      playerState.audio = audio; playerState.bar = bar;
+
+      const seek = bar.querySelector('.pb-seek'), cur = bar.querySelector('.pb-cur'), dur = bar.querySelector('.pb-dur'), toggle = bar.querySelector('.pb-toggle');
+      const hasDuration = () => isFinite(audio.duration) && audio.duration > 0;
+      const syncPosition = () => {
+        if (!hasDuration() || !navigator.mediaSession?.setPositionState) return;
+        try { navigator.mediaSession.setPositionState({ duration: audio.duration, playbackRate: audio.playbackRate || 1, position: Math.min(audio.currentTime, audio.duration) }); } catch (e) {}
+      };
+      const syncState = () => {
+        toggle.textContent = audio.paused ? '▶' : '⏸';
+        if ('mediaSession' in navigator) navigator.mediaSession.playbackState = audio.paused ? 'paused' : 'playing';
+        updatePlayButtons();
+      };
+
+      seek.addEventListener('input', () => { playerState.seeking = true; if (hasDuration()) cur.textContent = formatPlayTime(audio.duration * seek.value / 1000); });
+      seek.addEventListener('change', () => { if (hasDuration()) { audio.currentTime = audio.duration * seek.value / 1000; syncPosition(); } playerState.seeking = false; });
+      audio.addEventListener('timeupdate', () => {
+        if (playerState.seeking) return;
+        cur.textContent = formatPlayTime(audio.currentTime);
+        seek.value = hasDuration() ? Math.round(audio.currentTime / audio.duration * 1000) : 0;
+      });
+      audio.addEventListener('loadedmetadata', () => { dur.textContent = formatPlayTime(audio.duration); syncPosition(); });
+      audio.addEventListener('durationchange', () => { dur.textContent = formatPlayTime(audio.duration); });
+      audio.addEventListener('seeked', syncPosition);
+      audio.addEventListener('play', syncState);
+      audio.addEventListener('pause', syncState);
+      audio.addEventListener('ended', syncState);
+      audio.addEventListener('error', () => {
+        if (!audio.getAttribute('src') || audio.src.startsWith('data:')) return;
+        showToast('音源を読み込めませんでした');
+      });
+
+      if ('mediaSession' in navigator) {
+        const handle = (action, fn) => { try { navigator.mediaSession.setActionHandler(action, fn); } catch (e) {} };
+        handle('play', () => audio.play());
+        handle('pause', () => audio.pause());
+        handle('seekto', d => { audio.currentTime = d.seekTime; syncPosition(); });
+        handle('seekbackward', d => { audio.currentTime = Math.max(0, audio.currentTime - (d.seekOffset || 10)); });
+        handle('seekforward', d => { audio.currentTime = Math.min(hasDuration() ? audio.duration : Infinity, audio.currentTime + (d.seekOffset || 10)); });
+        handle('stop', () => closePlayer());
+      }
+
+      document.addEventListener('click', event => {
+        const btn = event.target.closest('#playerBar [data-action]');
+        if (!btn) return;
+        if (btn.dataset.action === 'player-toggle') { audio.paused ? audio.play().catch(() => {}) : audio.pause(); }
+        if (btn.dataset.action === 'player-close') closePlayer();
+      });
+      new MutationObserver(updatePlayButtons).observe(content, { childList: true, subtree: true });
+      return playerState;
+    }
+    function closePlayer() {
+      const p = playerState; if (!p.audio) return;
+      p.audio.pause(); p.audio.removeAttribute('src'); p.audio.load();
+      p.songId = null; p.bar.hidden = true; document.body.classList.remove('has-player');
+      if ('mediaSession' in navigator) { navigator.mediaSession.metadata = null; navigator.mediaSession.playbackState = 'none'; }
+      updatePlayButtons();
+    }
     async function playSong(id) {
-      const song=data.songs.find(item=>item.id===id); if(!song?.audioKey) return;
-      const { data: signed, error } = await supabaseClient.storage.from('song-audio').createSignedUrl(song.audioKey, 3600);
-      if (error) { showDatabaseError(error); return; }
-      let player=document.getElementById('audioPlayer'); if(!player){player=document.createElement('audio');player.id='audioPlayer';player.controls=true;player.style='position:fixed;left:50%;bottom:18px;z-index:40;width:min(420px,calc(100vw - 30px));transform:translateX(-50%)';document.body.appendChild(player);} player.src=signed.signedUrl; player.play(); showToast(`再生中：${song.title}`);
+      const song = data.songs.find(item => item.id === id); if (!song?.audioKey) return;
+      const p = ensurePlayer(), audio = p.audio;
+      if (p.songId === id && audio.getAttribute('src')) { audio.paused ? audio.play().catch(() => {}) : audio.pause(); return; }
+      // タップ直後に一度再生を開始して、iOSでも後からの再生が許可されるようにする
+      try { audio.src = SILENT_WAV; audio.play().catch(() => {}); } catch (e) {}
+      p.songId = id;
+      p.bar.querySelector('.pb-title').textContent = song.title;
+      p.bar.querySelector('.pb-cur').textContent = '0:00'; p.bar.querySelector('.pb-dur').textContent = '0:00'; p.bar.querySelector('.pb-seek').value = 0;
+      p.bar.hidden = false; document.body.classList.add('has-player');
+      const { data: signed, error } = await supabaseClient.storage.from('song-audio').createSignedUrl(song.audioKey, 10800);
+      if (p.songId !== id) return;   // 取得中に別の曲へ切り替えた場合
+      if (error || !signed?.signedUrl) { closePlayer(); showDatabaseError(error || new Error('音源のURLを取得できませんでした')); return; }
+      audio.src = signed.signedUrl;
+      try { await audio.play(); } catch (e) { console.warn('play failed', e); showToast('再生できませんでした。もう一度タップしてください'); }
+      if ('mediaSession' in navigator && window.MediaMetadata) {
+        navigator.mediaSession.metadata = new MediaMetadata({ title: song.title, artist: song.byline || '', album: data.clubName || data.schoolName || 'tutti' });
+      }
+      showToast(`再生中：${song.title}`);
     }
     document.addEventListener('click', handleClick);
     document.getElementById('scrim').addEventListener('click', closeDrawer);
