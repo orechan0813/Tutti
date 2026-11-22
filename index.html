@@ -294,6 +294,13 @@
     .about-item ul { list-style: none; }
     .about-item li { position: relative; padding-left: 14px; }
     .about-item li::before { content: ""; position: absolute; left: 1px; top: .85em; width: 5px; height: 5px; border-radius: 50%; background: var(--green); opacity: .55; }
+    .demo-button { width: 100%; min-height: 40px; margin-top: 9px; display: flex; align-items: center; justify-content: center; gap: 6px; border: 0; border-radius: 8px; background: var(--green-pale); color: var(--green); font-size: 12px; font-weight: 700; cursor: pointer; }
+    .demo-button:hover { filter: brightness(.97); }
+    .demo-hint { margin: 7px 0 0; color: var(--muted); font-size: 10.5px; text-align: center; }
+    .about-inner .demo-button { margin-top: 20px; }
+    .demo-banner { position: sticky; top: 0; z-index: 15; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 16px; background: var(--green); color: #fff; font-size: 11.5px; line-height: 1.5; }
+    .demo-banner[hidden] { display: none; }
+    .demo-banner button { flex: 0 0 auto; min-height: 30px; padding: 0 12px; border: 0; border-radius: 999px; background: #fff; color: var(--green); font-size: 11.5px; font-weight: 700; cursor: pointer; }
     .about-note { margin: 18px 0 0; color: var(--muted); font-size: 11px; text-align: center; letter-spacing: .04em; }
     .auth-panel { width: min(410px, 100%); margin-block: auto; flex: 0 0 auto; padding: 30px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); }
     .auth-panel h1 { margin-top: 20px; font-size: 22px; }
@@ -385,6 +392,7 @@
     </aside>
     <div class="drawer-scrim" id="scrim"></div>
     <main class="main">
+      <div class="demo-banner" id="demoBanner" hidden><span>デモ体験中（架空データ・保存されません）</span><button type="button" data-auth-action="demo-signup">登録して始める</button></div>
       <header class="topbar">
         <div class="top-left"><button class="icon-button mobile-menu" id="menuButton" aria-label="メニューを開く">☰</button><div class="crumb"><span id="crumbSchool">Tutti</span> / <strong id="crumbTitle">ホーム</strong></div></div>
         <div class="top-actions"><span class="today-label" id="topDate"></span><button class="icon-button" id="installAppButton" title="アプリをインストール" aria-label="アプリをインストール" hidden>↓</button><div class="user-avatar" id="topUserAvatar" style="width:31px;height:31px;font-size:11px">♪</div></div>
@@ -425,6 +433,7 @@
             </ul>
           </details>
         </div>
+        <button type="button" class="demo-button" data-auth-action="start-demo">▶　デモ画面を試す（登録不要）</button>
         <p class="about-note">Tutti ― 部活の毎日を、ひとつに。</p>
       </div>
     </section>
@@ -433,7 +442,9 @@
   <script>
     const SUPABASE_URL = 'https://wqdrpyrblirifljccyua.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_0DnFWVsGjn85uZpZwoFrNw_EGNoij_t';
-    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const realSupabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    let supabaseClient = realSupabaseClient;
+    let demoActive = false;
     const dayKey = date => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
     const japanDateKey = value => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(value));
     const japanGreeting = () => {
@@ -742,7 +753,7 @@
         return;
       }
       const signedInActions = '<button class="secondary-button" data-auth-action="sign-out">ログアウト</button>';
-      const authForm = `<form id="authForm" class="field-grid">${signupFields}<div class="field full"><label for="authEmail">メールアドレス</label><input id="authEmail" name="email" type="email" autocomplete="email" required></div><div class="field full"><label for="authPassword">パスワード</label><input id="authPassword" name="password" type="password" autocomplete="${registering ? 'new-password' : 'current-password'}" minlength="6" required></div><div class="field full"><button class="primary-button" type="submit">${registering ? '登録する' : 'ログイン'}</button></div></form><button class="secondary-button" style="width:100%;margin-top:9px" data-auth-action="toggle-mode">${registering ? 'ログイン画面に戻る' : '新規部員登録'}</button>`;
+      const authForm = `<form id="authForm" class="field-grid">${signupFields}<div class="field full"><label for="authEmail">メールアドレス</label><input id="authEmail" name="email" type="email" autocomplete="email" required></div><div class="field full"><label for="authPassword">パスワード</label><input id="authPassword" name="password" type="password" autocomplete="${registering ? 'new-password' : 'current-password'}" minlength="6" required></div><div class="field full"><button class="primary-button" type="submit">${registering ? '登録する' : 'ログイン'}</button></div></form><button class="secondary-button" style="width:100%;margin-top:9px" data-auth-action="toggle-mode">${registering ? 'ログイン画面に戻る' : '新規部員登録'}</button>${registering ? '' : '<button type="button" class="demo-button" data-auth-action="start-demo">▶　デモ画面を試す（登録不要）</button><p class="demo-hint">架空の部活データで、そのまま体験できます</p>'}`;
       document.getElementById('authStage').innerHTML = `<section class="auth-panel"><div class="brand" style="padding:0"><div class="brand-mark">T</div><div><div class="brand-name">tutti</div><div class="brand-caption">部活の毎日を、ひとつに。</div></div></div><h1>${title}</h1><p class="auth-message">${escapeHtml(message)}</p>${signedIn ? signedInActions : authForm}<div class="auth-error" id="authError"></div></section>`;
     }
     function handleWorkspaceError(error) {
@@ -1042,6 +1053,7 @@ function renderAdmin() {
       if (next !== pushState) { pushState = next; if (currentSession?.user) render(); }
     }
     async function enablePush() {
+      if (demoActive) { showToast('デモ体験中は通知の設定はできません'); return; }
       const permission = await Notification.requestPermission();
       if (permission !== 'granted') {
         pushState = permission === 'denied' ? 'denied' : 'off';
@@ -1057,6 +1069,7 @@ function renderAdmin() {
       pushState = 'on'; render(); showToast('通知をオンにしました');
     }
     async function disablePush({ quiet = false } = {}) {
+      if (demoActive) return;
       const registration = await navigator.serviceWorker.ready;
       const subscription = await registration.pushManager.getSubscription();
       if (subscription) {
@@ -1406,8 +1419,11 @@ function renderAdmin() {
           .then(({ error }) => showToast(error ? '再送に失敗しました。しばらくしてからお試しください。' : '確認コードを再送しました'));
         return;
       }
+      if (target.dataset.authAction === 'start-demo') { startDemo(); return; }
+      if (target.dataset.authAction === 'demo-signup') { exitDemo({ toSignup: true }); return; }
       if (target.dataset.authAction === 'toggle-mode') { authMode=authMode==='signin'?'signup':'signin'; authMessage=''; renderAuthGate(); return; }
       if (target.dataset.authAction === 'sign-out' || target.id === 'signOutButton') {
+        if (demoActive) { exitDemo(); return; }
         withTimeout(pushSupported() ? disablePush({ quiet: true }).catch(() => {}) : Promise.resolve(), 2500).then(() => supabaseClient.auth.signOut()).then(({ error }) => { if(error) showToast('ログアウトに失敗しました'); });
         return;
       }
@@ -1960,10 +1976,252 @@ function renderAdmin() {
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => navigator.serviceWorker.register('/service-worker.js').catch(error => console.error('Service Worker registration failed', error)));
     }
-    supabaseClient.auth.onAuthStateChange((_event, session) => {
-      window.setTimeout(() => applySession(session), 0);
+
+    /* ===== デモ体験モード =====
+       架空の部活データをメモリ上だけで動かします。本物のSupabase（DB・認証・ストレージ）には一切アクセスしません。
+       ページを再読み込みすると、すべて最初の状態に戻ります。 */
+    const DEMO_USER_ID = 'demo-user';
+    const DEMO_SCHOOL_ID = 'demo-school';
+    function createDemoBackend() {
+      let seq = 0;
+      const nid = prefix => `${prefix}-${++seq}`;
+      const S = DEMO_SCHOOL_ID;
+      const today = dayKey(new Date());
+      const jst = (key, hhmm) => `${key}T${hhmm}:00+09:00`;
+      const ago = days => new Date(Date.now() - days * 86400000).toISOString();
+      const copy = row => ({ ...row });
+      const files = {};
+      const member = (id, name, part, grade, admin) => ({ user_id: id, school_id: S, full_name: name, part, grade, grade_as_of: today, is_admin: admin });
+      const db = {
+        schools: [{ id: S, school_name: '青葉ヶ丘高校', club_name: 'オーケストラ部', invite_code: 'DEMO00000000' }],
+        profiles: [{ id: DEMO_USER_ID, school_id: S, full_name: '高橋 澪', part: 'Violin', grade: 3, grade_as_of: today, is_admin: true }],
+        school_memberships: [
+          member(DEMO_USER_ID, '高橋 澪', 'Violin', 3, true),
+          member('m-nakamura', '中村 蒼', 'Cello', 3, true),
+          member('m-inoue', '井上 莉子', 'Clarinet', 3, false),
+          member('m-sasaki', '佐々木 凛', 'Flute', 2, false),
+          member('m-yamaguchi', '山口 陽斗', 'Trumpet', 2, false),
+          member('m-shimizu', '清水 大和', 'Contrabass', 2, false),
+          member('m-hayashi', '林 茜', 'Oboe', 2, false),
+          member('m-watanabe', '渡辺 光', 'Violin', 2, false),
+          member('m-morita', '森田 ひなた', 'Viola', 1, false),
+          member('m-kimura', '木村 湊', 'Horn', 1, false),
+          member('m-matsumoto', '松本 翔', 'Percussion', 1, false),
+          member('m-saito', '斎藤 結衣', 'Violin', 1, false)
+        ],
+        schedules: [], schedule_items: [], reports: [], songs: [], announcements: [],
+        club_settings: [{ school_id: S, theme_page: '#f3f5ef', theme_ink: '#19332f', theme_font: 'DM Sans' }],
+        equipment_items: [], equipment_loans: []
+      };
+      const addEvent = (offset, start, end, title, place, detail, menus = []) => {
+        const key = shiftDay(offset), id = nid('sch');
+        db.schedules.push({ id, school_id: S, title, content: detail, location: place, starts_at: jst(key, start), ends_at: end ? jst(key, end) : null, starts_time_set: true });
+        menus.forEach((menu, index) => db.schedule_items.push({ id: nid('itm'), school_id: S, schedule_id: id, title: menu[2], start_time: `${menu[0]}:00`, end_time: menu[1] ? `${menu[1]}:00` : null, sort_order: index }));
+      };
+      addEvent(0, '16:00', '18:00', '全体合奏', '音楽室', '文化祭ステージに向けた全体合奏です。楽器・譜面・筆記用具を忘れずに。', [['16:00', '16:20', 'チューニング・ボウイング確認'], ['16:20', '17:20', '新世界より 第4楽章'], ['17:20', '18:00', 'カルメン組曲 通し']]);
+      addEvent(1, '15:45', '17:30', 'パート練習', '各教室', '弦・木管・金管・打楽器に分かれて練習します。');
+      addEvent(3, '16:00', '17:30', '弦分奏', '第1音楽室', '弦楽器のみの分奏です。ボウイングと音程をそろえます。', [['16:00', '16:30', 'スケール・ボウイング'], ['16:30', '17:30', 'くるみ割り人形 花のワルツ']]);
+      addEvent(4, '16:00', '17:30', '管分奏', '第2音楽室', '木管・金管の分奏です。バランスと音程を確認します。');
+      addEvent(7, '13:00', '16:30', '定期演奏会リハーサル', '市民ホール', 'ホールの響きを確認します。現地集合・現地解散です。');
+      addEvent(11, '10:30', '11:30', '文化祭ステージ', '体育館', '本番です。9:30までに音楽室へ集合してください。');
+      addEvent(14, '16:00', '18:00', '全体合奏', '音楽室', '演奏会プログラムの通し練習です。');
+      addEvent(-2, '16:00', '17:30', '基礎合奏', '音楽室', 'ロングトーンとスケール練習。');
+      addEvent(-5, '16:00', '17:30', '弦分奏', '第1音楽室', 'ボウイングの確認をしました。');
+      const report = (kind, who, title, reason, offset, arrival = null) => db.reports.push({ id: nid('rep'), school_id: S, reporter_id: who, kind, report_date: shiftDay(offset), title, reason, arrival_at: arrival, photo_url: null, status: 'pending', created_at: ago(-offset + 0.02 * seq) });
+      report('absence', 'm-sasaki', '練習を欠席します', '体調不良', 0);
+      report('absence', 'm-yamaguchi', '練習に遅刻します', 'ほかの用事', 0, '17:00:00');
+      report('absence', 'm-morita', '練習を欠席します', '通院', 1);
+      report('purchase_repair', 'm-shimizu', 'コントラバスの弦（A線）', 'メンテナンス · 今週中 · 張りがだいぶ弱くなってきました。', -1);
+      report('purchase_repair', 'm-hayashi', 'オーボエのリード', '消耗品 · 来週まで · 本番用に3本ほど追加したいです。', -2);
+      report('lost_found', 'm-morita', '青いハンカチ', '第2音楽室の窓際で見つけました。', -1);
+      const song = (title, composer, sort, query) => db.songs.push({ id: nid('song'), school_id: S, title, sort_reading: sort, composer, arranger: null, drive_url: null, youtube_url: `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`, audio_file_path: null });
+      song('新世界より 第4楽章', 'ドヴォルザーク', 'Shinsekai Yori', 'Dvorak New World Symphony 4th movement');
+      song('カルメン組曲', 'ビゼー', 'Carmen Suite', 'Bizet Carmen Suite');
+      song('花のワルツ（くるみ割り人形より）', 'チャイコフスキー', 'Hana no Waltz', 'Tchaikovsky Waltz of the Flowers');
+      song('交響曲第5番「運命」 第1楽章', 'ベートーヴェン', 'Symphony No.5', 'Beethoven Symphony 5 first movement');
+      song('アイネ・クライネ・ナハトムジーク', 'モーツァルト', 'Eine kleine Nachtmusik', 'Mozart Eine kleine Nachtmusik');
+      [['文化祭ステージの曲順が決まりました', '当日の曲順は ①新世界より 第4楽章 ②カルメン組曲 ③アンコール です。譜面は「楽譜・音源」から確認できます。', 1],
+       ['譜面台の返却をお願いします', '合奏のあとに出した譜面台は、必ず倉庫に戻してください。貸出状況は「備品貸出」で見られます。', 2],
+       ['定期演奏会 係決めフォーム', '今週金曜日までに、希望の係を入力してください。', 4]]
+        .forEach(([title, body, days]) => db.announcements.push({ id: nid('ann'), school_id: S, author_id: DEMO_USER_ID, title, body, created_at: ago(days) }));
+      const item = (name, total) => { const id = nid('eq'); db.equipment_items.push({ id, school_id: S, name, total_count: total }); return id; };
+      const stand = item('譜面台', 30), metro = item('メトロノーム', 6), tuner = item('チューナー', 8), mute = item('弱音器（ミュート）', 5);
+      const loan = (itemId, who, part, quantity, days) => db.equipment_loans.push({ id: nid('loan'), school_id: S, item_id: itemId, borrower_id: who, borrower_part: part, quantity, borrowed_at: ago(days), returned_at: null });
+      loan(stand, 'm-yamaguchi', 'Trumpet', 6, 0.3); loan(stand, 'm-sasaki', 'Flute', 4, 1);
+      loan(metro, 'm-matsumoto', 'Percussion', 2, 0.5); loan(tuner, 'm-inoue', 'Clarinet', 1, 2); loan(mute, 'm-yamaguchi', 'Trumpet', 2, 1);
+
+      const withDefaults = (table, value) => {
+        const base = { id: nid(table.slice(0, 3)), school_id: S };
+        if (table === 'reports') Object.assign(base, { reporter_id: DEMO_USER_ID, status: 'pending', arrival_at: null, photo_url: null, created_at: new Date().toISOString() });
+        if (table === 'announcements') Object.assign(base, { author_id: DEMO_USER_ID, created_at: new Date().toISOString() });
+        if (table === 'songs') Object.assign(base, { arranger: null, drive_url: null, youtube_url: null, audio_file_path: null });
+        if (table === 'equipment_loans') Object.assign(base, { returned_at: null, borrowed_at: new Date().toISOString() });
+        return { ...base, ...value };
+      };
+      const sortKey = value => (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value)) ? Date.parse(value) : value;
+      class DemoQuery {
+        constructor(table) { this.table = table; this.op = 'select'; this.filters = []; this.sortBy = null; this.max = null; this.mode = 'many'; this.returning = false; this.payload = null; }
+        select() { if (this.op !== 'select') this.returning = true; return this; }
+        insert(value) { this.op = 'insert'; this.payload = value; return this; }
+        update(value) { this.op = 'update'; this.payload = value; return this; }
+        delete() { this.op = 'delete'; return this; }
+        eq(column, value) { this.filters.push(row => row[column] === value); return this; }
+        in(column, values) { this.filters.push(row => values.includes(row[column])); return this; }
+        is(column, value) { this.filters.push(row => (row[column] ?? null) === value); return this; }
+        order(column, options = {}) { this.sortBy = { column, ascending: options.ascending !== false }; return this; }
+        limit(count) { this.max = count; return this; }
+        maybeSingle() { this.mode = 'maybe'; return this; }
+        single() { this.mode = 'single'; return this; }
+        then(resolve, reject) { return Promise.resolve().then(() => this.run()).then(resolve, reject); }
+        run() {
+          const rows = db[this.table];
+          if (!rows) return { data: null, error: { code: 'PGRST205', message: `${this.table} is not available in the demo` } };
+          const match = row => this.filters.every(test => test(row));
+          let out = [];
+          if (this.op === 'select') {
+            out = rows.filter(match).map(copy);
+            if (this.sortBy) {
+              const { column, ascending } = this.sortBy;
+              out.sort((a, b) => {
+                const x = sortKey(a[column]), y = sortKey(b[column]);
+                const result = (typeof x === 'string' && typeof y === 'string') ? x.localeCompare(y, 'ja') : (x > y ? 1 : x < y ? -1 : 0);
+                return ascending ? result : -result;
+              });
+            }
+            if (this.max != null) out = out.slice(0, this.max);
+          } else if (this.op === 'insert') {
+            for (const value of (Array.isArray(this.payload) ? this.payload : [this.payload])) {
+              if (this.table === 'equipment_items' && rows.some(row => row.name === value.name)) return { data: null, error: { code: '23505', message: 'duplicate' } };
+              const row = withDefaults(this.table, value);
+              rows.push(row);
+              out.push(copy(row));
+            }
+          } else if (this.op === 'update') {
+            rows.filter(match).forEach(row => { Object.assign(row, this.payload); out.push(copy(row)); });
+          } else {
+            for (let index = rows.length - 1; index >= 0; index--) {
+              if (!match(rows[index])) continue;
+              const [gone] = rows.splice(index, 1);
+              out.unshift(copy(gone));
+              if (this.table === 'equipment_items') db.equipment_loans = db.equipment_loans.filter(row => row.item_id !== gone.id);
+            }
+          }
+          if (this.op !== 'select' && !this.returning) return { data: null, error: null };
+          if (this.mode === 'maybe') return { data: out[0] ?? null, error: null };
+          if (this.mode === 'single') return out.length === 1 ? { data: out[0], error: null } : { data: null, error: { code: 'PGRST116', message: '対象が見つかりません。' } };
+          return { data: out, error: null };
+        }
+      }
+      const nothing = async () => ({ data: null, error: null });
+      const unavailable = async () => ({ data: null, error: { message: 'デモ体験中は使えない機能です。' } });
+      const rpcHandlers = {
+        is_school_owner: async () => ({ data: false, error: null }),
+        register_push_subscription: nothing,
+        unregister_push_subscription: nothing,
+        save_schedule: async args => {
+          if (!args.p_title || !args.p_date) return { data: null, error: { message: '入力内容を確認してください。' } };
+          const fields = { title: args.p_title, location: args.p_location, content: args.p_content || '', starts_at: `${args.p_date}T${args.p_start || '00:00'}:00+09:00`, ends_at: args.p_end ? `${args.p_date}T${args.p_end}:00+09:00` : null, starts_time_set: Boolean(args.p_start) };
+          let row = args.p_id ? db.schedules.find(item => item.id === args.p_id) : null;
+          if (row) Object.assign(row, fields);
+          else { row = { id: nid('sch'), school_id: S, ...fields }; db.schedules.push(row); }
+          db.schedule_items = db.schedule_items.filter(item => item.schedule_id !== row.id);
+          (args.p_items || []).forEach((menu, index) => db.schedule_items.push({ id: nid('itm'), school_id: S, schedule_id: row.id, title: menu.title, start_time: menu.start ? `${menu.start}:00` : null, end_time: menu.end ? `${menu.end}:00` : null, sort_order: index }));
+          return { data: row.id, error: null };
+        },
+        borrow_equipment_item: async args => {
+          const target = db.equipment_items.find(row => row.id === args.p_item_id);
+          if (!target) return { data: null, error: { message: '備品が見つかりません。' } };
+          const out = db.equipment_loans.filter(row => row.item_id === target.id && !row.returned_at).reduce((sum, row) => sum + row.quantity, 0);
+          if (args.p_quantity > target.total_count - out) return { data: null, error: { message: '空きが足りません。' } };
+          db.equipment_loans.push({ id: nid('loan'), school_id: S, item_id: target.id, borrower_id: DEMO_USER_ID, borrower_part: args.p_part, quantity: args.p_quantity, borrowed_at: new Date().toISOString(), returned_at: null });
+          return { data: null, error: null };
+        },
+        return_equipment_loan: async args => {
+          const row = db.equipment_loans.find(item => item.id === args.p_loan_id);
+          if (row) row.returned_at = new Date().toISOString();
+          return { data: null, error: null };
+        }
+      };
+      const fnHandlers = {
+        'manage-member': async body => {
+          const row = db.school_memberships.find(item => item.user_id === body.targetUserId);
+          if (!row) return { data: { error: '部員が見つかりません。' }, error: null };
+          if (body.action === 'delete') {
+            if (row.user_id === DEMO_USER_ID) return { data: { error: 'デモ体験中は、自分自身は削除できません。' }, error: null };
+            db.school_memberships.splice(db.school_memberships.indexOf(row), 1);
+          } else {
+            if (row.user_id === DEMO_USER_ID && body.isAdmin === false) return { data: { error: 'デモ体験中は、自分の権限は変更できません。' }, error: null };
+            if (body.fullName !== undefined) row.full_name = body.fullName;
+            if (body.part !== undefined) row.part = body.part;
+            if (body.grade !== undefined) { row.grade = body.grade; row.grade_as_of = today; }
+            if (body.isAdmin !== undefined) row.is_admin = body.isAdmin;
+          }
+          return { data: { ok: true }, error: null };
+        },
+        'join-group': async () => ({ data: { error: 'デモ体験中は団体に参加できません。登録してからお試しください。' }, error: null }),
+        'send-announcement-push': nothing,
+        'send-organization-welcome': nothing
+      };
+      return {
+        from: table => new DemoQuery(table),
+        rpc: async (name, args = {}) => rpcHandlers[name] ? rpcHandlers[name](args) : unavailable(),
+        functions: { invoke: async (name, options = {}) => fnHandlers[name] ? fnHandlers[name](options.body || {}) : unavailable() },
+        storage: { from: () => ({
+          upload: async (path, file) => { try { files[path] = URL.createObjectURL(file); } catch (error) { /* ignore */ } return { data: { path }, error: null }; },
+          createSignedUrl: async path => files[path] ? { data: { signedUrl: files[path] }, error: null } : { data: null, error: { message: 'demo' } },
+          getPublicUrl: path => ({ data: { publicUrl: files[path] || '' } }),
+          remove: async () => ({ data: [], error: null })
+        }) },
+        auth: {
+          signOut: async () => { exitDemo(); return { error: null }; },
+          getSession: async () => ({ data: { session: null }, error: null }),
+          onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }),
+          resend: nothing, verifyOtp: unavailable, signUp: unavailable, signInWithPassword: unavailable
+        },
+        channel: () => { const channel = { on() { return channel; }, subscribe() { return channel; } }; return channel; },
+        removeChannel: () => {}
+      };
+    }
+    function startDemo() {
+      demoActive = true;
+      supabaseClient = createDemoBackend();
+      currentSession = { user: { id: DEMO_USER_ID, email: 'demo@example.invalid', user_metadata: {} } };
+      currentProfile = null;
+      loadSequence++;
+      data = emptyWorkspace();
+      activePage = 'home';
+      authMessage = '';
+      document.getElementById('demoBanner').hidden = false;
+      loadWorkspace(currentSession.user, DEMO_SCHOOL_ID).catch(error => {
+        console.error('Demo failed to start', error);
+        exitDemo();
+        showToast('デモを開始できませんでした');
+      });
+    }
+    function exitDemo({ toSignup = false } = {}) {
+      demoActive = false;
+      supabaseClient = realSupabaseClient;
+      realtimeChannel = null;
+      currentSession = null;
+      currentProfile = null;
+      loadSequence++;
+      data = emptyWorkspace();
+      activePage = 'home';
+      authMode = toSignup ? 'signup' : 'signin';
+      if (toSignup) signupType = 'create';
+      authMessage = '';
+      closeModal();
+      closeDrawer();
+      document.getElementById('demoBanner').hidden = true;
+      render();
+      document.getElementById('authGate').scrollTop = 0;
+      realSupabaseClient.auth.getSession().then(({ data: sessionData }) => { if (sessionData?.session && !demoActive) applySession(sessionData.session); }).catch(() => {});
+    }
+    realSupabaseClient.auth.onAuthStateChange((_event, session) => {
+      window.setTimeout(() => { if (!demoActive) applySession(session); }, 0);
     });
-    supabaseClient.auth.getSession().then(({ data: sessionData, error }) => {
+    realSupabaseClient.auth.getSession().then(({ data: sessionData, error }) => {
+      if (demoActive) return;
       if (error) { authMessage = 'Supabase Authに接続できませんでした。'; render(); return; }
       applySession(sessionData.session);
     });
