@@ -276,6 +276,24 @@
     .equip-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
     .toast { position: fixed; right: 24px; bottom: 24px; z-index: 80; max-width: min(370px, calc(100vw - 32px)); padding: 12px 16px; background: #1d3831; color: white; border-radius: 8px; box-shadow: var(--shadow); font-size: 12px; opacity: 0; transform: translateY(8px); pointer-events: none; transition: .2s ease; }
     .toast.show { opacity: 1; transform: translateY(0); }
+
+    .a2hs-banner { position: fixed; left: 12px; right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); z-index: 70; display: flex; align-items: flex-start; gap: 10px; max-width: 520px; margin: 0 auto; padding: 12px 10px 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); box-shadow: 0 12px 35px rgba(37, 61, 51, .22); font-size: 12px; font-weight: 600; line-height: 1.6; }
+    .a2hs-banner[hidden] { display: none; }
+    .a2hs-text { flex: 1; min-width: 0; }
+    .a2hs-install { margin-top: 8px; min-height: 30px; padding: 0 14px; border: 0; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; }
+    .a2hs-install[hidden] { display: none; }
+    .a2hs-close { flex-shrink: 0; width: 28px; height: 28px; border: 0; border-radius: 50%; background: transparent; color: inherit; font-size: 18px; line-height: 1; cursor: pointer; opacity: .75; }
+    .a2hs-close:hover { opacity: 1; }
+    body.has-a2hs .toast { bottom: 130px; }
+    body.has-a2hs.has-player .toast { bottom: 210px; }
+    body.has-player .a2hs-banner { bottom: 96px; }
+    body.has-a2hs #content { padding-bottom: 110px; }
+    .line-share-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 34px; padding: 0 14px; border: 0; border-radius: 8px; background: #06c755; color: #fff; font-size: 12px; font-weight: 700; cursor: pointer; }
+    .line-share-button:hover { filter: brightness(.95); }
+    .line-share-button.compact { min-height: 30px; padding: 0 10px; font-size: 11px; }
+    .announcement-share { margin-top: 8px; }
+    .share-done { display: grid; gap: 12px; text-align: center; }
+    .share-done p { margin: 0; }
     .auth-gate { position: fixed; inset: 0; z-index: 100; overflow-y: auto; overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; background: var(--page); }
     .auth-gate[hidden] { display: none; }
     .auth-stage { min-height: 100%; display: flex; align-items: center; justify-content: center; padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom)); }
@@ -403,6 +421,7 @@
     </main>
   </div>
   <div class="modal-backdrop" id="modalBackdrop" role="presentation"><section class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"></section></div>
+  <div class="a2hs-banner" id="a2hsBanner" role="region" aria-label="ホーム画面に追加の案内" hidden><div class="a2hs-text"><span id="a2hsText"></span><br><button type="button" class="a2hs-install" id="a2hsInstall" hidden>アプリをインストール</button></div><button type="button" class="a2hs-close" id="a2hsClose" aria-label="閉じる">×</button></div>
   <div class="toast" id="toast" role="status"></div>
   <div class="auth-gate" id="authGate">
     <div class="auth-stage" id="authStage" aria-live="polite"></div>
@@ -789,9 +808,11 @@
       setTheme();
       if (!currentSession?.user || !currentProfile) {
         renderAuthGate();
+        updateA2hsBanner();
         return;
       }
       document.getElementById('authGate').hidden = true;
+      updateA2hsBanner();
       setActiveNav(activePage);
       document.getElementById('topDate').textContent = new Intl.DateTimeFormat('ja-JP', { year:'numeric', month:'long', day:'numeric', weekday:'short' }).format(new Date());
       document.getElementById('adminNav').innerHTML = data.isAdmin ? '<div class="nav-divider"></div><div class="nav-label">運営</div><button class="nav-item" data-page="admin"><span class="nav-icon">⚙</span>管理者画面<span class="nav-badge">'+data.requests.filter(item => item.kind !== 'absence' && item.status === '確認待ち').length+'</span></button>' : '';
@@ -826,7 +847,7 @@
         <div class="grid home-grid">
           <div class="stack">
             <section class="panel"><div class="panel-head"><div><div class="panel-title">本日の練習</div><div class="panel-note">みんなで合わせる時間</div></div><button class="quiet-button" data-page="calendar">カレンダー →</button></div><div class="panel-body">${todayEvents.length ? todayEvents.map(event => practiceCardMarkup(event)).join('') : '<div class="empty-state">今日は練習予定がありません。</div>'}</div></section>
-            <section class="panel"><div class="panel-head"><div><div class="panel-title">全体連絡</div><div class="panel-note">部員みんなへのお知らせ</div></div><span class="panel-note">${data.notices.length}件</span></div><div class="panel-body">${data.notices.length ? data.notices.slice(0,3).map(item => `<div class="announcement"><div class="announcement-mark">${escapeHtml(item.mark || '♪')}</div><div><div class="announcement-title">${escapeHtml(item.title)}</div><div class="announcement-copy">${escapeHtml(item.body)}</div><div class="announcement-date">${escapeHtml(dateLabel(item.date))}</div></div></div>`).join('') : '<div class="empty-state">新しい連絡はありません。</div>'}</div></section>
+            <section class="panel"><div class="panel-head"><div><div class="panel-title">全体連絡</div><div class="panel-note">部員みんなへのお知らせ</div></div><span class="panel-note">${data.notices.length}件</span></div><div class="panel-body">${data.notices.length ? data.notices.slice(0,3).map(item => `<div class="announcement"><div class="announcement-mark">${escapeHtml(item.mark || '♪')}</div><div><div class="announcement-title">${escapeHtml(item.title)}</div><div class="announcement-copy">${escapeHtml(item.body)}</div><div class="announcement-date">${escapeHtml(dateLabel(item.date))}</div>${data.isAdmin ? `<div class="announcement-share">${lineShareButton(item.title, false)}</div>` : ''}</div></div>`).join('') : '<div class="empty-state">新しい連絡はありません。</div>'}</div></section>
             <section class="panel"><div class="panel-head"><div><div class="panel-title">今日の欠席・遅刻</div><div class="panel-note">事前に届いた連絡</div></div><button class="quiet-button" data-page="calendar">履歴を見る →</button></div><div class="panel-body">${todayAbsences.length ? `<div class="person-list">${todayAbsences.map(item => `<div class="person-row"><div class="mini-avatar">${escapeHtml(initials(item.name))}</div><div class="person-info"><div class="person-name">${escapeHtml(item.name)}</div><div class="person-detail">${escapeHtml(item.detail)}</div></div><span class="person-tag">連絡済み</span></div>`).join('')}</div>` : '<div class="empty-state">欠席・遅刻の連絡はありません。</div>'}</div></section>
           </div>
           <div class="stack">
@@ -1162,7 +1183,7 @@ function renderAdmin() {
     }
     function historyRow(kind, item, sub) {
       const id = escapeHtml(item.id);
-      return `<div class="history-row"><div class="history-main"><div class="history-title">${escapeHtml(item.title)}</div><div class="history-sub">${escapeHtml(sub)}</div></div><div class="history-actions"><button class="secondary-button" type="button" data-action="history-edit" data-kind="${kind}" data-id="${id}">編集</button><button class="danger-button" type="button" data-action="history-delete" data-kind="${kind}" data-id="${id}">削除</button></div></div>`;
+      return `<div class="history-row"><div class="history-main"><div class="history-title">${escapeHtml(item.title)}</div><div class="history-sub">${escapeHtml(sub)}</div></div><div class="history-actions">${kind === 'notice' ? lineShareButton(item.title, true) : ''}<button class="secondary-button" type="button" data-action="history-edit" data-kind="${kind}" data-id="${id}">編集</button><button class="danger-button" type="button" data-action="history-delete" data-kind="${kind}" data-id="${id}">削除</button></div></div>`;
     }
     function renderHistory() {
       if (!modalBackdrop.classList.contains('open')) return;
@@ -1435,6 +1456,7 @@ function renderAdmin() {
         loadWorkspace(currentSession.user, target.dataset.schoolId).catch(handleWorkspaceError);
         return;
       }
+      if (target.dataset.action === 'share-line') { shareAnnouncementToLine(target.dataset.title || ''); return; }
       if (target.dataset.action === 'enable-push') { enablePush().catch(showDatabaseError); return; }
       if (target.dataset.action === 'disable-push') { disablePush().catch(showDatabaseError); return; }
       if (target.dataset.action === 'open-history') { openHistory().catch(showDatabaseError); return; }
@@ -1947,6 +1969,7 @@ function renderAdmin() {
           
           await loadWorkspace(currentSession.user); 
           showToast('全体連絡を投稿しました'); 
+          openModal('投稿が完了しました', `<div class="share-done"><p>「${escapeHtml(titleText)}」を投稿しました。<br>LINEグループにも知らせると、見逃しが減ります。</p>${lineShareButton(titleText, false)}<button type="button" class="secondary-button" data-action="close-modal">閉じる</button></div>`);
           sendAnnouncementPush(posted.id)
             .then(result => { if (result && typeof result.delivered === 'number') showToast(`全体連絡を投稿し、${result.delivered}台に通知しました`); })
             .catch(error => { console.error('Announcement push failed', error); showToast('投稿しました（通知は送信できませんでした）'); });
@@ -1958,6 +1981,62 @@ function renderAdmin() {
     document.addEventListener('click', event => { if(event.target.id==='scrim') closeDrawer(); });
     const originalOpenSongModal = openSongModal;
     openSongModal = function(song = null) { originalOpenSongModal(song); const form=document.getElementById('songForm'); if(song){form.dataset.id=song.id;form.dataset.audioKey=song.audioKey||'';} };
+
+    /* ===== ホーム画面に追加バナー ===== */
+    const A2HS_KEY = 'tutti_a2hs_dismissed_at';
+    const A2HS_HIDE_MS = 24 * 60 * 60 * 1000;
+    const isIosA2hs = () => isIosDevice();
+    const isAndroidOrMobile = () => /Android|Mobile|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    function a2hsDismissedRecently() {
+      try {
+        const at = Number(localStorage.getItem(A2HS_KEY));
+        return Number.isFinite(at) && at > 0 && Date.now() - at < A2HS_HIDE_MS;
+      } catch (error) { return false; }
+    }
+    function updateA2hsBanner() {
+      const banner = document.getElementById('a2hsBanner');
+      if (!banner) return;
+      const ios = isIosA2hs();
+      const mobile = ios || isAndroidOrMobile();
+      const show = mobile && !isStandaloneApp() && !a2hsDismissedRecently() && !demoActive && !!currentSession?.user;
+      banner.hidden = !show;
+      document.body.classList.toggle('has-a2hs', show);
+      if (!show) return;
+      document.getElementById('a2hsText').textContent = ios
+        ? '🔔 連絡の通知を受け取るには、画面下の『共有ボタン（□に↑）』→『ホーム画面に追加』を押してアプリ化してね！'
+        : '🔔 連絡の通知を受け取るには、ブラウザのメニュー（⋮）から『ホーム画面に追加（アプリをインストール）』を押してね！';
+      const install = document.getElementById('a2hsInstall');
+      install.hidden = !deferredInstallPrompt;
+      try {
+        const { bg, border, text } = historyButtonColors();
+        banner.style.background = bg; banner.style.borderColor = border; banner.style.color = text;
+        install.style.background = text; install.style.color = bg;
+      } catch (error) { /* テーマ取得に失敗したら既定の見た目 */ }
+    }
+    document.getElementById('a2hsClose').addEventListener('click', () => {
+      try { localStorage.setItem(A2HS_KEY, String(Date.now())); } catch (error) { /* 保存できなくても閉じる */ }
+      updateA2hsBanner();
+    });
+    document.getElementById('a2hsInstall').addEventListener('click', async () => {
+      if (!deferredInstallPrompt) return;
+      deferredInstallPrompt.prompt();
+      await deferredInstallPrompt.userChoice;
+      deferredInstallPrompt = null;
+      updateA2hsBanner();
+    });
+    window.addEventListener('beforeinstallprompt', () => setTimeout(updateA2hsBanner, 0));
+    window.addEventListener('appinstalled', () => setTimeout(updateA2hsBanner, 0));
+
+    /* ===== 全体連絡をLINEで知らせる ===== */
+    const TUTTI_APP_URL = 'https://tutti-pi.vercel.app/';
+    function shareAnnouncementToLine(title) {
+      const text = ['【Tutti】新しい全体連絡が投稿されました！🎺', 'タイトル：' + title, '', '詳細の確認はこちら👇', TUTTI_APP_URL].join('\n');
+      const link = document.createElement('a');
+      link.href = 'https://line.me/R/msg/text/?' + encodeURIComponent(text);
+      link.target = '_blank'; link.rel = 'noopener noreferrer';
+      document.body.appendChild(link); link.click(); link.remove();
+    }
+    const lineShareButton = (title, compact) => `<button type="button" class="line-share-button${compact ? ' compact' : ''}" data-action="share-line" data-title="${escapeHtml(title)}">${compact ? '📲 LINE' : '📲 LINEグループにも知らせる'}</button>`;
     const installAppButton = document.getElementById('installAppButton');
     window.addEventListener('beforeinstallprompt', event => {
       event.preventDefault();
