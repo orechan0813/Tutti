@@ -292,6 +292,17 @@
     .line-share-button:hover { filter: brightness(.95); }
     .line-share-button.compact { min-height: 30px; padding: 0 10px; font-size: 11px; }
     .announcement-share { margin-top: 8px; }
+
+    .announcement-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+    .announcement-head .announcement-title { min-width: 0; overflow-wrap: anywhere; }
+    .notice-menu-wrap { position: relative; flex-shrink: 0; margin: -4px -6px 0 0; }
+    .notice-menu-button { width: 28px; height: 28px; border: 0; border-radius: 50%; background: transparent; color: var(--muted); font-size: 18px; font-weight: 700; line-height: 1; cursor: pointer; }
+    .notice-menu-button:hover { background: var(--green-pale); }
+    .notice-menu { position: fixed; z-index: 60; min-width: 210px; padding: 6px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: 0 12px 35px rgba(37, 61, 51, .22); }
+    .notice-menu[hidden] { display: none; }
+    .notice-menu button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px; border: 0; border-radius: 7px; background: transparent; color: var(--ink); font-size: 12px; font-weight: 600; text-align: left; cursor: pointer; }
+    .notice-menu button:hover { background: var(--green-pale); }
+    .notice-menu button.is-danger { color: #c0392b; }
     .share-done { display: grid; gap: 12px; text-align: center; }
     .share-done p { margin: 0; }
     .auth-gate { position: fixed; inset: 0; z-index: 100; overflow-y: auto; overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; background: var(--page); }
@@ -847,7 +858,7 @@
         <div class="grid home-grid">
           <div class="stack">
             <section class="panel"><div class="panel-head"><div><div class="panel-title">本日の練習</div><div class="panel-note">みんなで合わせる時間</div></div><button class="quiet-button" data-page="calendar">カレンダー →</button></div><div class="panel-body">${todayEvents.length ? todayEvents.map(event => practiceCardMarkup(event)).join('') : '<div class="empty-state">今日は練習予定がありません。</div>'}</div></section>
-            <section class="panel"><div class="panel-head"><div><div class="panel-title">全体連絡</div><div class="panel-note">部員みんなへのお知らせ</div></div><span class="panel-note">${data.notices.length}件</span></div><div class="panel-body">${data.notices.length ? data.notices.slice(0,3).map(item => `<div class="announcement"><div class="announcement-mark">${escapeHtml(item.mark || '♪')}</div><div><div class="announcement-title">${escapeHtml(item.title)}</div><div class="announcement-copy">${escapeHtml(item.body)}</div><div class="announcement-date">${escapeHtml(dateLabel(item.date))}</div>${data.isAdmin ? `<div class="announcement-share">${lineShareButton(item.title, false)}</div>` : ''}</div></div>`).join('') : '<div class="empty-state">新しい連絡はありません。</div>'}</div></section>
+            <section class="panel"><div class="panel-head"><div><div class="panel-title">全体連絡</div><div class="panel-note">部員みんなへのお知らせ</div></div><span class="panel-note">${data.notices.length}件</span></div><div class="panel-body">${data.notices.length ? data.notices.slice(0,3).map(item => `<div class="announcement"><div class="announcement-mark">${escapeHtml(item.mark || '♪')}</div><div><div class="announcement-head"><div class="announcement-title">${escapeHtml(item.title)}</div>${data.isAdmin ? noticeMenu(item) : ''}</div><div class="announcement-copy">${escapeHtml(item.body)}</div><div class="announcement-date">${escapeHtml(dateLabel(item.date))}</div></div></div>`).join('') : '<div class="empty-state">新しい連絡はありません。</div>'}</div></section>
             <section class="panel"><div class="panel-head"><div><div class="panel-title">今日の欠席・遅刻</div><div class="panel-note">事前に届いた連絡</div></div><button class="quiet-button" data-page="calendar">履歴を見る →</button></div><div class="panel-body">${todayAbsences.length ? `<div class="person-list">${todayAbsences.map(item => `<div class="person-row"><div class="mini-avatar">${escapeHtml(initials(item.name))}</div><div class="person-info"><div class="person-name">${escapeHtml(item.name)}</div><div class="person-detail">${escapeHtml(item.detail)}</div></div><span class="person-tag">連絡済み</span></div>`).join('')}</div>` : '<div class="empty-state">欠席・遅刻の連絡はありません。</div>'}</div></section>
           </div>
           <div class="stack">
@@ -1456,7 +1467,9 @@ function renderAdmin() {
         loadWorkspace(currentSession.user, target.dataset.schoolId).catch(handleWorkspaceError);
         return;
       }
-      if (target.dataset.action === 'share-line') { shareAnnouncementToLine(target.dataset.title || ''); return; }
+      if (target.dataset.action === 'notice-menu') { toggleNoticeMenu(target); return; }
+      if (target.dataset.action === 'notice-delete') { closeNoticeMenus(); deleteNotice(target.dataset.id).catch(showDatabaseError); return; }
+      if (target.dataset.action === 'share-line') { closeNoticeMenus(); shareAnnouncementToLine(target.dataset.title || ''); return; }
       if (target.dataset.action === 'enable-push') { enablePush().catch(showDatabaseError); return; }
       if (target.dataset.action === 'disable-push') { disablePush().catch(showDatabaseError); return; }
       if (target.dataset.action === 'open-history') { openHistory().catch(showDatabaseError); return; }
@@ -2028,6 +2041,34 @@ function renderAdmin() {
     window.addEventListener('appinstalled', () => setTimeout(updateA2hsBanner, 0));
 
     /* ===== 全体連絡をLINEで知らせる ===== */
+
+    /* ===== 全体連絡カードの「…」メニュー（管理者のみ） ===== */
+    const noticeMenu = item => `<div class="notice-menu-wrap"><button type="button" class="notice-menu-button" data-action="notice-menu" aria-label="この連絡のメニュー" aria-haspopup="true">⋯</button><div class="notice-menu" hidden><button type="button" data-action="share-line" data-title="${escapeHtml(item.title)}">📲 LINEグループにも知らせる</button><button type="button" class="is-danger" data-action="notice-delete" data-id="${escapeHtml(item.id)}">🗑 この投稿を削除する</button></div></div>`;
+    const closeNoticeMenus = () => document.querySelectorAll('.notice-menu').forEach(menu => { menu.hidden = true; });
+    function toggleNoticeMenu(button) {
+      const menu = button.parentElement.querySelector('.notice-menu');
+      const willOpen = menu.hidden;
+      closeNoticeMenus();
+      if (!willOpen) return;
+      menu.hidden = false;
+      const rect = button.getBoundingClientRect();
+      const width = menu.offsetWidth || 210;
+      menu.style.left = Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8)) + 'px';
+      menu.style.top = (rect.bottom + 4) + 'px';
+    }
+    async function deleteNotice(id) {
+      if (!data.isAdmin) return;
+      const item = data.notices.find(row => row.id === id);
+      if (!item) return;
+      if (!window.confirm(`「${item.title}」を削除しますか？この操作は取り消せません。`)) return;
+      const deleted = checkedData(await supabaseClient.from('announcements').delete().eq('id', id).eq('school_id', data.schoolId).select('id'));
+      if (!deleted.length) throw new Error('削除できませんでした。すでに削除されているか、権限がありません。');
+      await loadWorkspace(currentSession.user);
+      showToast('全体連絡を削除しました');
+    }
+    document.addEventListener('click', event => { if (!event.target.closest('.notice-menu-wrap')) closeNoticeMenus(); });
+    window.addEventListener('scroll', closeNoticeMenus, true);
+    window.addEventListener('resize', closeNoticeMenus);
     const TUTTI_APP_URL = 'https://tutti-pi.vercel.app/';
     function shareAnnouncementToLine(title) {
       const text = ['【Tutti】新しい全体連絡が投稿されました！🎺', 'タイトル：' + title, '', '詳細の確認はこちら👇', TUTTI_APP_URL].join('\n');
